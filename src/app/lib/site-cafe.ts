@@ -1,12 +1,9 @@
 import type { cafes } from "@/app/db/schema";
 import type { Cafe } from "@/app/data/cafe";
+import { isNonEmptyString } from "@/app/lib/json";
 
 // Row shape returned by Drizzle for the `cafes` table.
 export type DbCafe = typeof cafes.$inferSelect;
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
-}
 
 function pickString(value: unknown, fallback: string): string {
   return isNonEmptyString(value) ? value : fallback;
@@ -54,12 +51,16 @@ function parsePostgresArrayLiteral(value: string): string[] | null {
 }
 
 /**
- * The `address` column is stored as `text`, but has held plain strings,
- * JSON-array strings, Postgres array literals, and (via some drivers) real
- * arrays. Normalize any of those into a clean string[], falling back to
- * static demo data when the value is missing or unusable.
+ * List columns (`address`, `gallery_images`, `hours`) are stored as `text`,
+ * and have historically held plain strings, JSON-array strings, Postgres
+ * array literals, and (via some drivers) real arrays. Normalize any of those
+ * into a clean string[], falling back to static demo data when the value is
+ * missing or unusable.
  */
-export function normalizeAddress(value: unknown, fallback: string[]): string[] {
+export function normalizeStringList(
+  value: unknown,
+  fallback: string[],
+): string[] {
   if (Array.isArray(value)) {
     const lines = value.filter(isNonEmptyString);
     return lines.length > 0 ? lines : fallback;
@@ -94,16 +95,16 @@ export function normalizeAddress(value: unknown, fallback: string[]): string[] {
   return fallback;
 }
 
-/** Encode a string[] for storage in the `address` text column. */
-export function serializeAddress(lines: string[]): string {
+/** Encode a string[] for storage in a text list column. */
+export function serializeStringList(lines: string[]): string {
   return JSON.stringify(lines);
 }
 
 /**
  * Merge database café data with static fallback/demo data.
- * Editable fields come from the database when usable; static-only fields
- * (hero image, gallery, menu, hours) always come from the fallback until
- * those areas get their own database-backed migrations.
+ * Editable fields come from the database when usable; menu items still come
+ * from the fallback here (the public page overlays the database menu
+ * separately via toPublicMenu).
  */
 export function getSiteCafe(dbCafe: DbCafe | undefined, fallback: Cafe): Cafe {
   if (!dbCafe) return fallback;
@@ -119,6 +120,12 @@ export function getSiteCafe(dbCafe: DbCafe | undefined, fallback: Cafe): Cafe {
     phone: pickString(dbCafe.phone, fallback.phone),
     instagram: pickString(dbCafe.instagram, fallback.instagram),
     mapsUrl: pickString(dbCafe.mapsUrl, fallback.mapsUrl),
-    address: normalizeAddress(dbCafe.address, fallback.address),
+    address: normalizeStringList(dbCafe.address, fallback.address),
+    heroImage: pickString(dbCafe.heroImage, fallback.heroImage),
+    galleryImages: normalizeStringList(
+      dbCafe.galleryImages,
+      fallback.galleryImages,
+    ),
+    hours: normalizeStringList(dbCafe.hours, fallback.hours),
   };
 }
