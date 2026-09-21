@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "create-user": "node --env-file=.env.local scripts/create-user.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
