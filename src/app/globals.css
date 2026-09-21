@@ -1,8 +1,29 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------- tokens */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f3eee5;
+  --foreground: #201a16;
+  --surface: #fbf8f2;
+  --surface-deep: #27201c;
+  --ink-muted: #756a60;
+  --accent: #b56e45;
+  --accent-soft: #e8b995;
+  --line: rgba(32, 26, 22, 0.14);
+  --line-inverse: rgba(255, 250, 243, 0.18);
+
+  /* Fluid type scale - one ramp used everywhere, so headings stay in tune. */
+  --step-0: clamp(1rem, 0.96rem + 0.2vw, 1.125rem);
+  --step-1: clamp(1.2rem, 1.1rem + 0.5vw, 1.5rem);
+  --step-3: clamp(2.25rem, 1.7rem + 2.6vw, 3.5rem);
+  --step-4: clamp(3rem, 2rem + 4.6vw, 5.5rem);
+  --step-6: clamp(4rem, 1.6rem + 10.5vw, 10.5rem);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-smooth: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  --shell: 88rem;
+  --gutter: clamp(1.25rem, 4vw, 4rem);
 }
 
 @theme inline {
@@ -10,17 +31,405 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* ------------------------------------------------------------------ base */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Geist is loaded by next/font; use it instead of falling back to Arial. */
+  font-family:
+    var(--font-geist-sans),
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: var(--step-0);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--accent);
+  color: #fff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.font-display {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 0.95;
+}
+
+.eyebrow {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.display-xl {
+  font-size: var(--step-6);
+  line-height: 0.84;
+  letter-spacing: -0.055em;
+}
+
+.display-lg {
+  font-size: var(--step-4);
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+}
+
+.display-md {
+  font-size: var(--step-3);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+}
+
+.lede {
+  font-size: var(--step-1);
+  line-height: 1.6;
+  color: var(--ink-muted);
+  text-wrap: pretty;
+}
+
+.shell {
+  width: 100%;
+  max-width: var(--shell);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.section-pad {
+  padding-block: clamp(5rem, 12vw, 11rem);
+}
+
+.site-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.site-mark__dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  transition:
+    transform 500ms var(--ease-out-expo),
+    background-color 500ms ease;
+}
+
+.site-mark:hover .site-mark__dot {
+  transform: scale(1.45);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* --------------------------------------------------------------- buttons */
+.button-primary,
+.button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.1rem;
+  border-radius: 999px;
+  padding: 0.75rem 1.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+  /* Sheen sweeps across on hover. It is painted above the background colour
+     but below the label, so it needs no stacking context of its own. */
+  background-image: linear-gradient(
+    115deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.22) 50%,
+    transparent 60%
+  );
+  background-size: 250% 100%;
+  background-position: 135% 0;
+  background-repeat: no-repeat;
+  transition:
+    transform 260ms var(--ease-out-expo),
+    background-color 260ms ease,
+    background-position 760ms var(--ease-smooth),
+    color 260ms ease,
+    border-color 260ms ease,
+    box-shadow 260ms ease;
+}
+
+.button-primary {
+  background-color: var(--surface-deep);
+  color: #fffaf3;
+}
+
+.button-primary:hover {
+  background-color: var(--accent);
+  background-position: -35% 0;
+  transform: translateY(-2px);
+  box-shadow: 0 0.9rem 2rem -0.9rem rgba(32, 26, 22, 0.75);
+}
+
+.button-secondary {
+  border: 1px solid currentColor;
+}
+
+/* Light fill for use on dark photography. */
+.button-light {
+  background-color: #fffaf3;
+  color: var(--foreground);
+}
+
+.button-light:hover {
+  background-color: var(--accent-soft);
+}
+
+.button-secondary:hover {
+  background-position: -35% 0;
+  transform: translateY(-2px);
+}
+
+/* Click micro-interaction: a short, crisp press. */
+.button-primary:active,
+.button-secondary:active {
+  transform: translateY(0) scale(0.975);
+  transition-duration: 90ms;
+}
+
+.button-arrow {
+  display: inline-block;
+  margin-left: 0.55rem;
+  transition: transform 340ms var(--ease-out-expo);
+}
+
+.button-primary:hover .button-arrow,
+.button-secondary:hover .button-arrow {
+  transform: translate(0.18rem, 0.18rem);
+}
+
+/* Underline that draws in from the left. */
+.link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 420ms var(--ease-smooth);
+}
+
+.link-underline:hover,
+.link-underline:focus-visible {
+  background-size: 100% 1px;
+}
+
+/* ---------------------------------------------------------------- images */
+.image-frame {
+  position: relative;
+  overflow: hidden;
+  background: #d8cabc;
+}
+
+.image-frame img {
+  transition:
+    transform 1100ms var(--ease-smooth),
+    filter 900ms ease;
+}
+
+.image-frame:hover img {
+  transform: scale(1.045);
+  filter: saturate(1.07);
+}
+
+/* Warm inner vignette keeps photography feeling printed, not pasted on. */
+.image-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 5rem rgba(32, 26, 22, 0.16);
+}
+
+/* Gallery tiles settle from a slight over-scale as they reveal. */
+.reveal .image-frame img {
+  transform: scale(1.1);
+}
+
+.reveal--visible .image-frame img {
+  transform: scale(1);
+}
+
+/* ---------------------------------------------------------- scroll reveal */
+.reveal {
+  opacity: 0;
+  transition:
+    opacity 950ms var(--ease-out-expo),
+    transform 950ms var(--ease-out-expo),
+    filter 950ms var(--ease-out-expo);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+.reveal[data-variant="up"] {
+  transform: translateY(1.75rem);
+}
+
+.reveal[data-variant="scale"] {
+  transform: scale(0.965);
+}
+
+.reveal[data-variant="blur"] {
+  transform: translateY(1rem);
+  filter: blur(8px);
+}
+
+.reveal--visible {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+/* ------------------------------------------------------------------ hero */
+.hero-media {
+  transform-origin: 58% 45%;
+  animation: ken-burns 26s var(--ease-smooth) both;
+}
+
+@keyframes ken-burns {
+  from {
+    transform: scale(1.14);
+  }
+  to {
+    transform: scale(1.01);
+  }
+}
+
+.hero-enter {
+  opacity: 0;
+  transform: translateY(1.6rem);
+  animation: hero-in 1100ms var(--ease-out-expo) both;
+  animation-delay: var(--enter-delay, 0ms);
+}
+
+@keyframes hero-in {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.scroll-cue__line {
+  display: block;
+  width: 1px;
+  height: 3.25rem;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 250, 243, 0.85),
+    rgba(255, 250, 243, 0)
+  );
+  transform-origin: top;
+  animation: cue-drift 2.6s ease-in-out infinite;
+}
+
+@keyframes cue-drift {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------------ menu */
+.menu-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  column-gap: clamp(0.75rem, 2vw, 2rem);
+}
+
+/* Classic dot leader between dish and price, on wider screens only. */
+.menu-leader {
+  display: none;
+  border-bottom: 1px dotted rgba(32, 26, 22, 0.28);
+  transform: translateY(-0.3rem);
+}
+
+@media (min-width: 640px) {
+  .menu-row {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .menu-leader {
+    display: block;
+  }
+}
+
+.menu-row__price {
+  font-variant-numeric: tabular-nums;
+  transition: color 300ms ease;
+}
+
+.menu-row:hover .menu-row__price {
+  color: var(--accent);
+}
+
+/* --------------------------------------------------- section transitions */
+/* Soft optical seam where the page turns from paper to dark roast. */
+.seam-to-dark {
+  height: clamp(3rem, 7vw, 6rem);
+  background: linear-gradient(
+    to bottom,
+    var(--background),
+    var(--surface-deep)
+  );
+}
+
+/* --------------------------------------------------------- reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Never leave content stuck in its hidden start state. */
+  .reveal,
+  .hero-enter {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  .hero-media {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .reveal .image-frame img,
+  .image-frame:hover img {
+    transform: none !important;
+  }
+
+  .scroll-cue__line {
+    animation: none !important;
+    opacity: 0.7;
+  }
 }
