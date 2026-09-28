@@ -114,6 +114,10 @@ export async function POST(request: Request) {
     const heroImage = parseImageUrl(data.heroImage, "Hero image");
     if (!heroImage.ok) return apiError(heroImage.error, 400);
 
+    // The gallery moved to its own table and /dashboard/gallery. This legacy
+    // column is still read as a fallback, so only touch it when the caller
+    // actually sends the field — an omitted field must never wipe it.
+    const managesGallery = data.galleryImages !== undefined;
     const galleryImages = parseGalleryImages(data.galleryImages);
     if (!galleryImages.ok) return apiError(galleryImages.error, 400);
 
@@ -135,10 +139,14 @@ export async function POST(request: Request) {
         address: serializeStringList(addressLines),
         heroImage: heroImage.value,
         // Empty means "fall back to the demo gallery/hours" on the public site.
-        galleryImages:
-          galleryImages.value.length > 0
-            ? serializeStringList(galleryImages.value)
-            : null,
+        ...(managesGallery
+          ? {
+              galleryImages:
+                galleryImages.value.length > 0
+                  ? serializeStringList(galleryImages.value)
+                  : null,
+            }
+          : {}),
         hours: hours.value.length > 0 ? serializeStringList(hours.value) : null,
       })
       .where(eq(cafes.id, session.cafeId))

@@ -6,6 +6,7 @@ import {
   numeric,
   boolean,
   timestamp,
+  date,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -83,6 +84,70 @@ export const menuItems = pgTable(
 );
 
 /**
+ * Gallery photos for a café, newest schema for what used to live in the
+ * legacy `cafes.gallery_images` JSON column. That column is intentionally
+ * kept so existing sites keep their photos until they are backfilled here.
+ */
+export const galleryImages = pgTable(
+  "gallery_images",
+  {
+    id: serial("id").primaryKey(),
+    cafeId: integer("cafe_id")
+      .notNull()
+      .references(() => cafes.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    /** Null means "describe it from the café name" when rendering. */
+    alt: text("alt"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isPublished: boolean("is_published").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("gallery_images_cafe_sort_idx").on(table.cafeId, table.sortOrder),
+  ],
+);
+
+/**
+ * Promotional offers shown on the public site.
+ *
+ * `startDate`/`endDate` are `date` columns in string mode ("YYYY-MM-DD"), not
+ * timestamps: a café offer runs for calendar days in its own locality, so
+ * storing a wall-clock date avoids the timezone drift a timestamp would
+ * introduce. Both bounds are inclusive and optional — see `offerStatus` in
+ * lib/offers for the single definition of when an offer is publicly live.
+ */
+export const offers = pgTable(
+  "offers",
+  {
+    id: serial("id").primaryKey(),
+    cafeId: integer("cafe_id")
+      .notNull()
+      .references(() => cafes.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    imageUrl: text("image_url"),
+    /** Free text such as "20% off" or "₹99" — cafés phrase offers in many ways. */
+    value: text("value"),
+    startDate: date("start_date"),
+    endDate: date("end_date"),
+    isPublished: boolean("is_published").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("offers_cafe_sort_idx").on(table.cafeId, table.sortOrder)],
+);
+
+/**
  * A user belongs to exactly one café. Every authenticated request resolves its
  * cafeId from here, never from client input.
  */
@@ -125,3 +190,5 @@ export const sessions = pgTable(
 export type MenuCategoryRow = typeof menuCategories.$inferSelect;
 export type MenuItemRow = typeof menuItems.$inferSelect;
 export type UserRow = typeof users.$inferSelect;
+export type GalleryImageRow = typeof galleryImages.$inferSelect;
+export type OfferRow = typeof offers.$inferSelect;

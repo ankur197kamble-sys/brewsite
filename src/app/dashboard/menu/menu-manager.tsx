@@ -9,7 +9,7 @@ import {
   type MenuItemView,
 } from "@/app/lib/menu";
 import { ItemDialog, type ItemDraft } from "./item-dialog";
-import { ConfirmDialog } from "./confirm-dialog";
+import { ConfirmDialog } from "../confirm-dialog";
 
 const primaryButton =
   "rounded-full bg-[#1f1a17] px-5 py-2.5 text-sm font-medium text-white transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40";

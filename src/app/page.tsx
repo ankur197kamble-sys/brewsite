@@ -6,8 +6,16 @@ import { SectionIntro } from "@/app/components/section-intro";
 import { SiteMark } from "@/app/components/site-mark";
 import { cafe } from "@/app/data/cafe";
 import { getCafe } from "@/app/db/cafe";
+import { getPublishedGallery } from "@/app/db/gallery";
 import { getMenu } from "@/app/db/menu";
+import { getPublishedOffers } from "@/app/db/offers";
+import { toPublicGallery, type GalleryImageView } from "@/app/lib/gallery";
 import { toPublicMenu, type MenuCategoryView } from "@/app/lib/menu";
+import {
+  formatOfferDate,
+  toPublicOffers,
+  type OfferView,
+} from "@/app/lib/offers";
 import { getSiteCafe, type DbCafe } from "@/app/lib/site-cafe";
 import { getPublicCafeId } from "@/app/lib/tenant";
 
@@ -40,11 +48,15 @@ export default async function Home() {
   const cafeId = getPublicCafeId();
   let dbCafe: DbCafe | undefined;
   let menuCategories: MenuCategoryView[] = [];
+  let galleryRows: GalleryImageView[] = [];
+  let offerRows: OfferView[] = [];
 
   try {
-    [dbCafe, menuCategories] = await Promise.all([
+    [dbCafe, menuCategories, galleryRows, offerRows] = await Promise.all([
       getCafe(cafeId),
       getMenu(cafeId),
+      getPublishedGallery(cafeId),
+      getPublishedOffers(cafeId),
     ]);
   } catch (error) {
     console.error("Failed to load café from database:", error);
@@ -52,6 +64,16 @@ export default async function Home() {
 
   const siteCafe = getSiteCafe(dbCafe, cafe);
   const menu = toPublicMenu(menuCategories, siteCafe.menuItems);
+  // Managed gallery first, then the café's legacy image list, which itself
+  // falls back to the static demo photos — so this band is never empty.
+  const gallery = toPublicGallery(
+    galleryRows,
+    siteCafe.galleryImages,
+    siteCafe.name,
+  );
+  // Only offers that are published and inside their date window. The section
+  // is omitted entirely when empty rather than rendering a hollow band.
+  const offers = toPublicOffers(offerRows);
 
   return (
     <main className="overflow-hidden bg-[#f3eee5] text-[#201a16]">
@@ -149,20 +171,20 @@ export default async function Home() {
         aria-label={`Inside ${siteCafe.name}`}
         className="shell grid grid-cols-2 gap-3 pb-6 sm:gap-4 lg:grid-cols-12 lg:gap-6"
       >
-        {siteCafe.galleryImages.map((image, index) => {
+        {gallery.images.map((image, index) => {
           const tile = galleryTiles[index % galleryTiles.length];
 
           return (
             <Reveal
-              key={`${index}-${image}`}
+              key={image.key}
               delay={index * 130}
               variant="scale"
               className={tile.wrap}
             >
               <figure className={`image-frame relative ${tile.frame}`}>
                 <Image
-                  src={image}
-                  alt={`${siteCafe.name}: atmosphere ${index + 1}`}
+                  src={image.url}
+                  alt={image.alt}
                   className="object-cover"
                   fill
                   sizes={tile.sizes}
@@ -172,6 +194,85 @@ export default async function Home() {
           );
         })}
       </section>
+
+      {/* ---------------------------------------------------------- offers */}
+      {offers.length > 0 && (
+        <section id="offers" className="shell section-pad scroll-mt-16">
+          <SectionIntro
+            eyebrow="What is on"
+            title={
+              <>
+                A little
+                <br />
+                something extra.
+              </>
+            }
+            titleClassName="display-lg"
+          />
+
+          <div className="mt-14 grid gap-8 md:grid-cols-2 lg:gap-10">
+            {offers.map((offer, index) => (
+              <Reveal
+                key={offer.id}
+                delay={index * 110}
+                className={index === 0 ? "md:col-span-2" : ""}
+              >
+                <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-[#201a16]/12 bg-[#fbf8f2]">
+                  {offer.imageUrl && (
+                    <figure
+                      className={`image-frame relative ${
+                        index === 0
+                          ? "h-[18rem] sm:h-[24rem]"
+                          : "h-[14rem] sm:h-[17rem]"
+                      }`}
+                    >
+                      <Image
+                        src={offer.imageUrl}
+                        alt=""
+                        className="object-cover"
+                        fill
+                        sizes={
+                          index === 0
+                            ? "(max-width: 768px) 100vw, 80vw"
+                            : "(max-width: 768px) 100vw, 40vw"
+                        }
+                      />
+                    </figure>
+                  )}
+
+                  <div className="flex flex-1 flex-col p-7 sm:p-9">
+                    {offer.value && (
+                      <p className="eyebrow mb-4 text-[#b56e45]">
+                        {offer.value}
+                      </p>
+                    )}
+
+                    <h3
+                      className={`font-display tracking-[-0.035em] ${
+                        index === 0 ? "text-4xl sm:text-5xl" : "text-3xl"
+                      }`}
+                    >
+                      {offer.title}
+                    </h3>
+
+                    {offer.description && (
+                      <p className="mt-4 leading-7 text-[#756a60]">
+                        {offer.description}
+                      </p>
+                    )}
+
+                    {offer.endDate && (
+                      <p className="mt-6 text-sm text-[#756a60]">
+                        Until {formatOfferDate(offer.endDate)}
+                      </p>
+                    )}
+                  </div>
+                </article>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ------------------------------------------------------------ menu */}
       <section id="menu" className="shell section-pad max-w-5xl scroll-mt-16">

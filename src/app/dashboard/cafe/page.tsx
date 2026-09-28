@@ -1,22 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { cafe } from "../../data/cafe";
 import { normalizeStringList } from "../../lib/site-cafe";
 import { ALLOWED_IMAGE_HOSTS } from "../../lib/image-hosts";
 
-const GALLERY_SLOTS = 3;
-
 const inputClass =
   "mt-3 w-full rounded-xl border border-black/10 bg-white px-4 py-3 outline-none focus:border-black/30";
-
-/** The gallery is a fixed three-slot layout on the public site. */
-function toGallerySlots(images: string[]): string[] {
-  return Array.from(
-    { length: GALLERY_SLOTS },
-    (_, index) => images[index] ?? "",
-  );
-}
 
 function messageFrom(payload: unknown): string | null {
   if (typeof payload !== "object" || payload === null) return null;
@@ -36,9 +27,6 @@ export default function CafeInformation() {
   const [mapsUrl, setMapsUrl] = useState(cafe.mapsUrl);
   const [address, setAddress] = useState(cafe.address);
   const [heroImage, setHeroImage] = useState(cafe.heroImage);
-  const [galleryImages, setGalleryImages] = useState(
-    toGallerySlots(cafe.galleryImages),
-  );
   const [hoursText, setHoursText] = useState(cafe.hours.join("\n"));
 
   const [saving, setSaving] = useState(false);
@@ -71,11 +59,6 @@ export default function CafeInformation() {
         // Show what the public site currently renders, which is the static
         // fallback until the café saves its own value.
         setHeroImage(data.heroImage ?? cafe.heroImage);
-        setGalleryImages(
-          toGallerySlots(
-            normalizeStringList(data.galleryImages, cafe.galleryImages),
-          ),
-        );
         setHoursText(normalizeStringList(data.hours, cafe.hours).join("\n"));
       } catch (error) {
         console.error("Failed to load café:", error);
@@ -106,9 +89,6 @@ export default function CafeInformation() {
           mapsUrl,
           address,
           heroImage: heroImage.trim(),
-          galleryImages: galleryImages
-            .map((image) => image.trim())
-            .filter((image) => image.length > 0),
           hours: hoursText
             .split("\n")
             .map((line) => line.trim())
@@ -228,41 +208,17 @@ export default function CafeInformation() {
         </div>
 
         <div className="rounded-2xl border border-black/10 bg-white/50 p-6">
-          <label className="text-sm font-medium">Gallery Images</label>
+          <p className="text-sm font-medium">Gallery Images</p>
           <p className="mt-1 text-sm text-black/50">
-            Three photos shown between your story and the menu. The first is
-            displayed largest.
+            Gallery photos now live in their own section, where you can add as
+            many as you like, reorder them and set alt text.
           </p>
-
-          <div className="mt-3 space-y-3">
-            {galleryImages.map((image, index) => (
-              <div key={index}>
-                <label
-                  className="text-xs text-black/50"
-                  htmlFor={`gallery-image-${index}`}
-                >
-                  Image {index + 1}
-                  {index === 0 ? " (large)" : ""}
-                </label>
-                <input
-                  id={`gallery-image-${index}`}
-                  type="url"
-                  value={image}
-                  onChange={(event) => {
-                    const updated = [...galleryImages];
-                    updated[index] = event.target.value;
-                    setGalleryImages(updated);
-                  }}
-                  placeholder={`https://${ALLOWED_IMAGE_HOSTS[0]}/...`}
-                  className="mt-1 w-full rounded-xl border border-black/10 bg-white px-4 py-3 outline-none focus:border-black/30"
-                />
-              </div>
-            ))}
-          </div>
-
-          <p className="mt-2 text-xs text-black/45">
-            Leave all three blank to use the default gallery.
-          </p>
+          <Link
+            href="/dashboard/gallery"
+            className="mt-4 inline-flex rounded-full border border-black/15 px-5 py-2.5 text-sm font-medium transition hover:bg-black/5"
+          >
+            Manage gallery
+          </Link>
         </div>
 
         <div className="rounded-2xl border border-black/10 bg-white/50 p-6">

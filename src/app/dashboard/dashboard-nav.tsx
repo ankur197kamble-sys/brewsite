@@ -7,16 +7,12 @@ const sections = [
   { href: "/dashboard", label: "Overview" },
   { href: "/dashboard/cafe", label: "Café Information" },
   { href: "/dashboard/menu", label: "Menu" },
+  { href: "/dashboard/gallery", label: "Gallery" },
+  { href: "/dashboard/offers", label: "Offers" },
 ];
 
 /** Planned sections — shown so the shape of the product is visible. */
-const upcoming = [
-  "Gallery",
-  "Offers",
-  "Opening Hours",
-  "Analytics",
-  "Settings",
-];
+const upcoming = ["Opening Hours", "Analytics", "Settings"];
 
 export function DashboardNav() {
   const pathname = usePathname();

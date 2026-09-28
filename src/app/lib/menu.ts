@@ -1,5 +1,10 @@
 import type { MenuItem as StaticMenuItem } from "@/app/data/cafe";
 import { asRecord } from "@/app/lib/json";
+import { invalid, parseId, type Validated } from "@/app/lib/validation";
+
+// Re-exported so existing importers of these generic helpers keep working.
+export { parseId, parseMoveDirection } from "@/app/lib/validation";
+export type { MoveDirection, Validated } from "@/app/lib/validation";
 
 /** Platform default. Becomes a per-café setting when currencies are needed. */
 export const CURRENCY_SYMBOL = "₹";
@@ -41,16 +46,6 @@ export type MenuItemInput = {
 export type CategoryInput = {
   name: string;
 };
-
-export type MoveDirection = "up" | "down";
-
-export type Validated<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: string };
-
-function invalid<T>(error: string): Validated<T> {
-  return { ok: false, error };
-}
 
 /**
  * Accepts what a price field realistically receives — "220", "220.5",
@@ -121,12 +116,6 @@ function parseImageUrl(
   } catch {
     return { ok: false };
   }
-}
-
-export function parseId(value: unknown): number | null {
-  const id = typeof value === "string" ? Number(value) : value;
-  if (typeof id !== "number" || !Number.isInteger(id) || id < 1) return null;
-  return id;
 }
 
 export function validateCategoryInput(body: unknown): Validated<CategoryInput> {
@@ -251,13 +240,6 @@ export function validateMenuItemPatch(
   if (Object.keys(patch).length === 0) return invalid("Nothing to update");
 
   return { ok: true, value: patch };
-}
-
-export function parseMoveDirection(body: unknown): MoveDirection | null {
-  const record = asRecord(body);
-  if (!record) return null;
-  if (record.move === "up" || record.move === "down") return record.move;
-  return null;
 }
 
 export type PublicMenuItem = {
