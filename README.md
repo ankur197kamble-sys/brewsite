@@ -40,6 +40,13 @@ Drizzle ORM.
    ```bash
    npm run create-user -- owner@example.com "a-long-password" 1
    ```
+   To change a password later (e.g. a forgotten one), run the command below.
+   It prompts for the new password without showing it and signs the account
+   out everywhere. It writes to the shared database, so it also applies to
+   the live site.
+   ```bash
+   npm run set-password -- owner@example.com
+   ```
 6. Start the app at http://localhost:3000:
    ```bash
    npm run dev

@@ -10,6 +10,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "create-user": "node --env-file=.env.local scripts/create-user.mjs",
+    "set-password": "node --env-file=.env.local scripts/set-password.mjs",
     "backfill-gallery": "node --env-file=.env.local scripts/backfill-gallery.mjs",
     "test:offers": "node --env-file=.env.local scripts/test-offers.mjs",
     "test:menu": "node --env-file=.env.local scripts/test-menu.mjs",
