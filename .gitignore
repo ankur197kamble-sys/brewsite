@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Customer onboarding data (menus, contact details) lives in the database,
+# not in this public repository.
+/onboarding/

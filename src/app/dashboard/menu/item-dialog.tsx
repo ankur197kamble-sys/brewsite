@@ -1,6 +1,19 @@
 "use client";
 
-import { useEffect, useRef, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+} from "react";
+import {
+  ALLOWED_IMAGE_HOSTS,
+  IMAGE_SOURCE_HINT,
+  parseImageUrl,
+} from "@/app/lib/image-hosts";
+import { ImageUpload } from "../image-upload";
 import { parsePrice, type MenuCategoryView } from "@/app/lib/menu";
 
 export type ItemDraft = {
@@ -22,7 +35,8 @@ type Props = {
   categories: MenuCategoryView[];
   busy: boolean;
   error: string | null;
-  onChange: (draft: ItemDraft) => void;
+  /** The parent's state setter, so async updates can apply to the latest draft. */
+  onChange: Dispatch<SetStateAction<ItemDraft | null>>;
   onSubmit: (draft: ItemDraft) => void;
   onCancel: () => void;
 };
@@ -37,6 +51,7 @@ export function ItemDialog({
   onCancel,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -48,19 +63,28 @@ export function ItemDialog({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (draft) onSubmit(draft);
+    if (draft && !uploading) onSubmit(draft);
   }
 
   const priceIsValid = draft === null || parsePrice(draft.price) !== null;
+  // Same host rule the API enforces, so a bad link is caught before saving.
+  const checkedImage = draft ? parseImageUrl(draft.imageUrl, "Image URL") : null;
+  const imageProblem =
+    checkedImage && !checkedImage.ok ? checkedImage.error : null;
   const canSubmit =
-    draft !== null && draft.name.trim().length > 0 && priceIsValid && !busy;
+    draft !== null &&
+    draft.name.trim().length > 0 &&
+    priceIsValid &&
+    imageProblem === null &&
+    !busy &&
+    !uploading;
 
   return (
     <dialog
       ref={dialogRef}
       onClose={onCancel}
       aria-label={draft?.id === null ? "Add menu item" : "Edit menu item"}
-      className="w-[min(34rem,calc(100vw-2rem))] rounded-2xl border border-black/10 bg-[#f7f3ed] p-0 text-[#1f1a17] backdrop:bg-black/40"
+      className="m-auto w-[min(34rem,calc(100vw-2rem))] rounded-2xl border border-black/10 bg-[#f7f3ed] p-0 text-[#1f1a17] backdrop:bg-black/40"
     >
       {draft && (
         <form onSubmit={handleSubmit} className="p-6 md:p-8">
@@ -162,12 +186,32 @@ export function ItemDialog({
               <input
                 id="item-image"
                 type="url"
-                placeholder="https://..."
+                placeholder={`https://${ALLOWED_IMAGE_HOSTS[0]}/...`}
                 value={draft.imageUrl}
                 onChange={(event) =>
                   onChange({ ...draft, imageUrl: event.target.value })
                 }
+                aria-invalid={imageProblem !== null}
+                aria-describedby="item-image-hint"
                 className={fieldClass}
+              />
+              <p
+                id="item-image-hint"
+                className={
+                  imageProblem
+                    ? "mt-2 text-xs text-red-900"
+                    : "mt-2 text-xs text-black/45"
+                }
+              >
+                {imageProblem ?? IMAGE_SOURCE_HINT}
+              </p>
+              <ImageUpload
+                label="menu item"
+                disabled={busy}
+                onBusyChange={setUploading}
+                onUploaded={(imageUrl) =>
+                  onChange((current) => current && { ...current, imageUrl })
+                }
               />
             </div>
 

@@ -3,7 +3,6 @@ import { db } from "@/app/db";
 import { cafes } from "@/app/db/schema";
 import { normalizeStringList, serializeStringList } from "@/app/lib/site-cafe";
 import { parseImageUrl } from "@/app/lib/image-hosts";
-import { cafe as fallbackCafe } from "@/app/data/cafe";
 import { getCafeSession } from "@/app/lib/session";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
 import { asRecord, isNonEmptyString } from "@/app/lib/json";
@@ -101,15 +100,19 @@ export async function POST(request: Request) {
       return apiError("Café name is required", 400);
     }
 
+    // A missing, zero or implausible year is stored as "unknown" so the
+    // public site hides it rather than showing "Since 0".
     const foundedYear =
-      typeof data.foundedYear === "number" && Number.isFinite(data.foundedYear)
+      typeof data.foundedYear === "number" &&
+      Number.isInteger(data.foundedYear) &&
+      data.foundedYear >= 1800 &&
+      data.foundedYear <= new Date().getFullYear() + 1
         ? data.foundedYear
         : null;
 
-    const addressLines = normalizeStringList(
-      data.address,
-      fallbackCafe.address,
-    );
+    // Blank lines are dropped; an empty address is stored as empty rather
+    // than replaced with demo data, and the public site hides it.
+    const addressLines = normalizeStringList(data.address, []);
 
     const heroImage = parseImageUrl(data.heroImage, "Hero image");
     if (!heroImage.ok) return apiError(heroImage.error, 400);
@@ -129,6 +132,10 @@ export async function POST(request: Request) {
       .set({
         name: data.name.trim(),
         foundedYear,
+        // Only touched when sent, so older clients never wipe it.
+        ...(data.highlights !== undefined
+          ? { highlights: optionalText(data.highlights) }
+          : {}),
         tagline: optionalText(data.tagline),
         story: optionalText(data.story),
         storySecondary: optionalText(data.storySecondary),
@@ -136,9 +143,10 @@ export async function POST(request: Request) {
         phone: optionalText(data.phone),
         instagram: optionalText(data.instagram),
         mapsUrl: optionalText(data.mapsUrl),
-        address: serializeStringList(addressLines),
+        address:
+          addressLines.length > 0 ? serializeStringList(addressLines) : null,
         heroImage: heroImage.value,
-        // Empty means "fall back to the demo gallery/hours" on the public site.
+        // An empty gallery falls back to demo photos; empty hours are hidden.
         ...(managesGallery
           ? {
               galleryImages:

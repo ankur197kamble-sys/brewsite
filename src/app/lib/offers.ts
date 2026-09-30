@@ -31,12 +31,23 @@ export type OfferInput = {
 
 /* ----------------------------------------------------------------- dates */
 
-/** Calendar date in the server's locality, formatted as the columns store it. */
+/**
+ * Offer dates are the café's calendar days, so "today" must be read in the
+ * café's time zone rather than the server's — hosts typically run on UTC,
+ * which would start and end Indian offers 5½ hours late. Platform default
+ * until time zone becomes a per-café setting.
+ */
+export const CAFE_TIME_ZONE = "Asia/Kolkata";
+
+/** Today's calendar date in the café's time zone, as the columns store it. */
 export function today(): string {
-  const now = new Date();
-  const month = `${now.getMonth() + 1}`.padStart(2, "0");
-  const day = `${now.getDate()}`.padStart(2, "0");
-  return `${now.getFullYear()}-${month}-${day}`;
+  // en-CA formats as YYYY-MM-DD.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: CAFE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 /** Strict "YYYY-MM-DD" that also rejects impossible days like 2026-02-31. */

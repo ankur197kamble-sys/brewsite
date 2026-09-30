@@ -12,6 +12,7 @@ import type {
   MenuItemInput,
   MoveDirection,
 } from "@/app/lib/menu";
+import type { MoveResult } from "@/app/lib/validation";
 
 /**
  * Every function here takes an explicit cafeId and filters on it. Tenant
@@ -171,7 +172,7 @@ export async function moveCategory(
   cafeId: number,
   categoryId: number,
   direction: MoveDirection,
-): Promise<boolean> {
+): Promise<MoveResult> {
   const ordered = await db
     .select({ id: menuCategories.id, sortOrder: menuCategories.sortOrder })
     .from(menuCategories)
@@ -179,10 +180,10 @@ export async function moveCategory(
     .orderBy(asc(menuCategories.sortOrder), asc(menuCategories.id));
 
   const index = ordered.findIndex((row) => row.id === categoryId);
-  if (index === -1) return false;
+  if (index === -1) return "not_found";
 
   const target = direction === "up" ? index - 1 : index + 1;
-  if (target < 0 || target >= ordered.length) return false;
+  if (target < 0 || target >= ordered.length) return "edge";
 
   [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
 
@@ -203,7 +204,7 @@ export async function moveCategory(
       ),
   );
 
-  return true;
+  return "moved";
 }
 
 export async function createItem(
@@ -272,14 +273,14 @@ export async function moveItem(
   cafeId: number,
   itemId: number,
   direction: MoveDirection,
-): Promise<boolean> {
+): Promise<MoveResult> {
   const [item] = await db
     .select({ categoryId: menuItems.categoryId })
     .from(menuItems)
     .where(and(eq(menuItems.cafeId, cafeId), eq(menuItems.id, itemId)))
     .limit(1);
 
-  if (!item) return false;
+  if (!item) return "not_found";
 
   const ordered = await db
     .select({ id: menuItems.id, sortOrder: menuItems.sortOrder })
@@ -293,10 +294,10 @@ export async function moveItem(
     .orderBy(asc(menuItems.sortOrder), asc(menuItems.id));
 
   const index = ordered.findIndex((row) => row.id === itemId);
-  if (index === -1) return false;
+  if (index === -1) return "not_found";
 
   const target = direction === "up" ? index - 1 : index + 1;
-  if (target < 0 || target >= ordered.length) return false;
+  if (target < 0 || target >= ordered.length) return "edge";
 
   [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
 
@@ -312,5 +313,5 @@ export async function moveItem(
       ),
   );
 
-  return true;
+  return "moved";
 }

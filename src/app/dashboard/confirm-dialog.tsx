@@ -36,7 +36,7 @@ export function ConfirmDialog({
       ref={dialogRef}
       onClose={onCancel}
       aria-label={title}
-      className="w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-black/10 bg-[#f7f3ed] p-0 text-[#1f1a17] backdrop:bg-black/40"
+      className="m-auto w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-black/10 bg-[#f7f3ed] p-0 text-[#1f1a17] backdrop:bg-black/40"
     >
       <div className="p-6 md:p-8">
         <h2 className="text-xl font-semibold tracking-tight">{title}</h2>

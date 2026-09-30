@@ -1,4 +1,5 @@
-import type { CSSProperties } from "react";
+import { cache, type CSSProperties } from "react";
+import type { Metadata } from "next";
 import Image from "next/image";
 import { Parallax } from "@/app/components/parallax";
 import { Reveal } from "@/app/components/reveal";
@@ -16,7 +17,12 @@ import {
   toPublicOffers,
   type OfferView,
 } from "@/app/lib/offers";
-import { getSiteCafe, type DbCafe } from "@/app/lib/site-cafe";
+import {
+  getSiteCafe,
+  telHref,
+  whatsappHref,
+  type DbCafe,
+} from "@/app/lib/site-cafe";
 import { getPublicCafeId } from "@/app/lib/tenant";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +50,26 @@ const galleryTiles = [
   },
 ];
 
+/** One café lookup per request, shared by the page and its metadata. */
+const loadPublicCafe = cache(async (): Promise<DbCafe | undefined> => {
+  try {
+    return await getCafe(getPublicCafeId());
+  } catch (error) {
+    console.error("Failed to load café from database:", error);
+    return undefined;
+  }
+});
+
+export async function generateMetadata(): Promise<Metadata> {
+  const siteCafe = getSiteCafe(await loadPublicCafe(), cafe);
+  return {
+    title: siteCafe.name,
+    description: siteCafe.highlights
+      ? `${siteCafe.highlights}. ${siteCafe.tagline}`
+      : siteCafe.tagline,
+  };
+}
+
 export default async function Home() {
   const cafeId = getPublicCafeId();
   let dbCafe: DbCafe | undefined;
@@ -53,7 +79,7 @@ export default async function Home() {
 
   try {
     [dbCafe, menuCategories, galleryRows, offerRows] = await Promise.all([
-      getCafe(cafeId),
+      loadPublicCafe(),
       getMenu(cafeId),
       getPublishedGallery(cafeId),
       getPublishedOffers(cafeId),
@@ -64,6 +90,23 @@ export default async function Home() {
 
   const siteCafe = getSiteCafe(dbCafe, cafe);
   const menu = toPublicMenu(menuCategories, siteCafe.menuItems);
+  const heroLine = [
+    siteCafe.highlights,
+    siteCafe.foundedYear ? `Since ${siteCafe.foundedYear}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const hasContact = Boolean(siteCafe.whatsapp || siteCafe.phone);
+  // A full café menu (dozens of dishes) gets denser rows, two columns on wide
+  // screens and category jump links; a short signature menu keeps the airy
+  // editorial layout.
+  const menuItemCount = menu.sections.reduce(
+    (total, section) => total + section.items.length,
+    0,
+  );
+  const compactMenu = menuItemCount > 16;
+  const showMenuNav =
+    menu.sections.length > 3 && menu.sections.every((section) => section.name);
   // Managed gallery first, then the café's legacy image list, which itself
   // falls back to the static demo photos — so this band is never empty.
   const gallery = toPublicGallery(
@@ -76,7 +119,10 @@ export default async function Home() {
   const offers = toPublicOffers(offerRows);
 
   return (
-    <main className="overflow-hidden bg-[#f3eee5] text-[#201a16]">
+    // overflow-x-clip (not overflow-hidden) contains the parallax and zoom
+    // effects sideways without creating a scroll container, which would stop
+    // the menu's sticky category bar from sticking.
+    <main className="overflow-x-clip bg-[#f3eee5] text-[#201a16]">
       {/* ------------------------------------------------------------ hero */}
       <section className="relative isolate flex min-h-[100svh] flex-col justify-between overflow-hidden text-[#fffaf3]">
         <Parallax
@@ -113,12 +159,14 @@ export default async function Home() {
         </header>
 
         <div className="shell pb-14 lg:pb-20">
-          <p
-            className="eyebrow hero-enter mb-7 text-white/75"
-            style={enterAfter(160)}
-          >
-            Specialty coffee · Since {siteCafe.foundedYear}
-          </p>
+          {heroLine && (
+            <p
+              className="eyebrow hero-enter mb-7 text-white/75"
+              style={enterAfter(160)}
+            >
+              {heroLine}
+            </p>
+          )}
 
           <h1
             className="font-display display-xl hero-enter max-w-5xl text-balance"
@@ -288,7 +336,35 @@ export default async function Home() {
           titleClassName="display-lg"
         />
 
-        <div className="mt-16 space-y-16">
+        {showMenuNav && (
+          // Sticks while scrolling through the menu (and only the menu), so
+          // any category is one tap away from anywhere in a long list.
+          <nav
+            aria-label="Menu categories"
+            className="sticky top-0 z-10 -mx-[var(--gutter)] mt-10 bg-[#f3eee5]/95 px-[var(--gutter)] py-3 backdrop-blur"
+          >
+            <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 lg:flex-wrap lg:overflow-visible">
+              {menu.sections.map((section) => (
+                <li key={section.key} className="shrink-0">
+                  <a
+                    href={`#menu-${section.key}`}
+                    className="inline-flex min-h-11 items-center rounded-full border border-[#201a16]/15 px-4 text-sm font-medium whitespace-nowrap transition hover:border-[#201a16]/40 hover:bg-[#201a16]/5 focus-visible:outline-2 focus-visible:outline-offset-2"
+                  >
+                    {section.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
+
+        <div
+          className={
+            compactMenu
+              ? "mt-12 lg:columns-2 lg:gap-16"
+              : "mt-16 space-y-16"
+          }
+        >
           {menu.sections.length === 0 ? (
             <Reveal>
               <p className="lede">
@@ -297,8 +373,18 @@ export default async function Home() {
             </Reveal>
           ) : (
             menu.sections.map((section, sectionIndex) => (
-              <Reveal key={section.key} delay={sectionIndex * 90}>
-                <div>
+              <Reveal
+                key={section.key}
+                // A long menu reveals section by section as it scrolls in;
+                // stacking the stagger would leave later sections waiting.
+                delay={(compactMenu ? sectionIndex % 2 : sectionIndex) * 90}
+                className={compactMenu ? "mb-12 break-inside-avoid" : ""}
+              >
+                <div
+                  id={`menu-${section.key}`}
+                  // Clears the sticky category bar when jumped to.
+                  className={showMenuNav ? "scroll-mt-24 lg:scroll-mt-32" : ""}
+                >
                   {section.name && (
                     <h3 className="eyebrow mb-6 text-[#b56e45]">
                       {section.name}
@@ -309,10 +395,12 @@ export default async function Home() {
                     {section.items.map((item) => (
                       <article
                         key={item.key}
-                        className="menu-row border-b border-[#201a16]/12 py-7"
+                        className={`menu-row border-b border-[#201a16]/12 ${compactMenu ? "py-4" : "py-7"}`}
                       >
                         <div className="sm:max-w-lg">
-                          <h4 className="text-xl font-semibold tracking-[-0.02em]">
+                          <h4
+                            className={`font-semibold tracking-[-0.02em] ${compactMenu ? "text-lg" : "text-xl"}`}
+                          >
                             {item.name}
                           </h4>
                           {item.description && (
@@ -324,7 +412,9 @@ export default async function Home() {
 
                         <span aria-hidden="true" className="menu-leader" />
 
-                        <p className="menu-row__price font-display text-2xl">
+                        <p
+                          className={`menu-row__price font-display ${compactMenu ? "text-xl" : "text-2xl"}`}
+                        >
                           {item.price}
                         </p>
                       </article>
@@ -360,52 +450,78 @@ export default async function Home() {
           />
 
           <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-1 lg:gap-14">
-            <Reveal delay={120}>
-              <h3 className="eyebrow mb-5 text-[#e8b995]">Location</h3>
-              <address className="text-lg leading-8 not-italic text-[#fffaf3]/80">
-                {siteCafe.address.map((line, index) => (
-                  <span key={`${index}-${line}`} className="block">
-                    {line}
-                  </span>
-                ))}
-              </address>
-              <a
-                href={siteCafe.mapsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="button-secondary mt-7 border-white/45 text-white hover:border-white"
-              >
-                Directions
-                <span aria-hidden="true" className="button-arrow">
-                  ↗
-                </span>
-              </a>
-            </Reveal>
-
-            <Reveal delay={220}>
-              <h3 className="eyebrow mb-5 text-[#e8b995]">Opening hours</h3>
-              <dl className="text-lg text-[#fffaf3]/80">
-                {siteCafe.hours.map((hour, index) => (
-                  <div
-                    key={`${index}-${hour}`}
-                    className="border-b border-white/12 py-2.5 last:border-b-0"
+            {(siteCafe.address.length > 0 || siteCafe.mapsUrl) && (
+              <Reveal delay={120}>
+                <h3 className="eyebrow mb-5 text-[#e8b995]">Location</h3>
+                {siteCafe.address.length > 0 && (
+                  <address className="text-lg leading-8 not-italic text-[#fffaf3]/80">
+                    {siteCafe.address.map((line, index) => (
+                      <span key={`${index}-${line}`} className="block">
+                        {line}
+                      </span>
+                    ))}
+                  </address>
+                )}
+                {siteCafe.mapsUrl && (
+                  <a
+                    href={siteCafe.mapsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="button-secondary mt-7 border-white/45 text-white hover:border-white"
                   >
-                    <dd>{hour}</dd>
+                    Directions
+                    <span aria-hidden="true" className="button-arrow">
+                      ↗
+                    </span>
+                  </a>
+                )}
+              </Reveal>
+            )}
+
+            {(siteCafe.hours.length > 0 || hasContact) && (
+              <Reveal delay={220}>
+                <h3 className="eyebrow mb-5 text-[#e8b995]">
+                  {siteCafe.hours.length > 0 ? "Opening hours" : "Get in touch"}
+                </h3>
+                {siteCafe.hours.length > 0 && (
+                  <ul className="text-lg text-[#fffaf3]/80">
+                    {siteCafe.hours.map((hour, index) => (
+                      <li
+                        key={`${index}-${hour}`}
+                        className="border-b border-white/12 py-2.5 last:border-b-0"
+                      >
+                        {hour}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {hasContact && (
+                  <div className="mt-7 flex flex-wrap gap-3">
+                    {siteCafe.whatsapp && (
+                      <a
+                        href={whatsappHref(siteCafe.whatsapp)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="button-primary"
+                      >
+                        Chat on WhatsApp
+                        <span aria-hidden="true" className="button-arrow">
+                          ↗
+                        </span>
+                      </a>
+                    )}
+                    {siteCafe.phone && (
+                      <a
+                        href={telHref(siteCafe.phone)}
+                        className="button-secondary border-white/45 text-white hover:border-white"
+                      >
+                        Call {siteCafe.phone}
+                      </a>
+                    )}
                   </div>
-                ))}
-              </dl>
-              <a
-                href={`https://wa.me/${siteCafe.whatsapp}`}
-                target="_blank"
-                rel="noreferrer"
-                className="button-primary mt-7"
-              >
-                Chat on WhatsApp
-                <span aria-hidden="true" className="button-arrow">
-                  ↗
-                </span>
-              </a>
-            </Reveal>
+                )}
+              </Reveal>
+            )}
           </div>
         </div>
       </section>
@@ -415,26 +531,34 @@ export default async function Home() {
         <div className="mx-auto flex max-w-[88rem] flex-col justify-between gap-7 border-t border-white/15 py-9 text-sm text-white/60 sm:flex-row sm:items-center">
           <SiteMark name={siteCafe.name} className="text-white" />
 
-          <nav className="flex gap-7" aria-label="Elsewhere">
-            <a
-              href={siteCafe.instagram}
-              target="_blank"
-              rel="noreferrer"
-              className="link-underline transition hover:text-white"
-            >
-              Instagram
-            </a>
-            <a
-              href={siteCafe.mapsUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="link-underline transition hover:text-white"
-            >
-              Directions
-            </a>
-          </nav>
+          {(siteCafe.instagram || siteCafe.mapsUrl) && (
+            <nav className="flex gap-7" aria-label="Elsewhere">
+              {siteCafe.instagram && (
+                <a
+                  href={siteCafe.instagram}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="link-underline transition hover:text-white"
+                >
+                  Instagram
+                </a>
+              )}
+              {siteCafe.mapsUrl && (
+                <a
+                  href={siteCafe.mapsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="link-underline transition hover:text-white"
+                >
+                  Directions
+                </a>
+              )}
+            </nav>
+          )}
 
-          <p>© {new Date().getFullYear()}</p>
+          <p>
+            © {new Date().getFullYear()} {siteCafe.name}
+          </p>
         </div>
       </footer>
     </main>

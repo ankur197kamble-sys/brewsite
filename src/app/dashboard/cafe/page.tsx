@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { cafe } from "../../data/cafe";
 import { normalizeStringList } from "../../lib/site-cafe";
-import { ALLOWED_IMAGE_HOSTS } from "../../lib/image-hosts";
+import { ALLOWED_IMAGE_HOSTS, IMAGE_SOURCE_HINT } from "../../lib/image-hosts";
+import { ImageUpload } from "../image-upload";
 
 const inputClass =
   "mt-3 w-full rounded-xl border border-black/10 bg-white px-4 py-3 outline-none focus:border-black/30";
@@ -17,7 +18,9 @@ function messageFrom(payload: unknown): string | null {
 
 export default function CafeInformation() {
   const [name, setName] = useState(cafe.name);
-  const [foundedYear, setFoundedYear] = useState(cafe.foundedYear);
+  // Kept as text so an unknown year can be left blank.
+  const [foundedYear, setFoundedYear] = useState(String(cafe.foundedYear));
+  const [highlights, setHighlights] = useState(cafe.highlights);
   const [tagline, setTagline] = useState(cafe.tagline);
   const [story, setStory] = useState(cafe.story);
   const [storySecondary, setStorySecondary] = useState(cafe.storySecondary);
@@ -30,6 +33,7 @@ export default function CafeInformation() {
   const [hoursText, setHoursText] = useState(cafe.hours.join("\n"));
 
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<{
     kind: "error" | "success";
     message: string;
@@ -47,7 +51,8 @@ export default function CafeInformation() {
         const data = result.data;
 
         setName(data.name ?? "");
-        setFoundedYear(data.foundedYear ?? 0);
+        setFoundedYear(data.foundedYear ? String(data.foundedYear) : "");
+        setHighlights(data.highlights ?? "");
         setTagline(data.tagline ?? "");
         setStory(data.story ?? "");
         setStorySecondary(data.storySecondary ?? "");
@@ -55,11 +60,18 @@ export default function CafeInformation() {
         setPhone(data.phone ?? "");
         setInstagram(data.instagram ?? "");
         setMapsUrl(data.mapsUrl ?? "");
-        setAddress(normalizeStringList(data.address, cafe.address));
+        // Never pre-fill facts with demo values: saving would publish them.
+        const addressLines = normalizeStringList(data.address, []);
+        setAddress(
+          [...addressLines, "", "", ""].slice(
+            0,
+            Math.max(3, addressLines.length),
+          ),
+        );
         // Show what the public site currently renders, which is the static
         // fallback until the café saves its own value.
         setHeroImage(data.heroImage ?? cafe.heroImage);
-        setHoursText(normalizeStringList(data.hours, cafe.hours).join("\n"));
+        setHoursText(normalizeStringList(data.hours, []).join("\n"));
       } catch (error) {
         console.error("Failed to load café:", error);
       }
@@ -79,7 +91,8 @@ export default function CafeInformation() {
         },
         body: JSON.stringify({
           name,
-          foundedYear,
+          foundedYear: foundedYear.trim() ? Number(foundedYear) : null,
+          highlights,
           tagline,
           story,
           storySecondary,
@@ -147,13 +160,42 @@ export default function CafeInformation() {
         </div>
 
         <div className="rounded-2xl border border-black/10 bg-white/50 p-6">
-          <label className="text-sm font-medium">Founded Year</label>
+          <label className="text-sm font-medium" htmlFor="founded-year">
+            Founded Year
+          </label>
           <input
+            id="founded-year"
             type="number"
+            inputMode="numeric"
             value={foundedYear}
-            onChange={(event) => setFoundedYear(Number(event.target.value))}
+            onChange={(event) => setFoundedYear(event.target.value)}
+            placeholder="e.g. 2021"
+            aria-describedby="founded-year-hint"
             className="mt-3 w-full rounded-xl border border-black/10 bg-white px-4 py-3 outline-none focus:border-black/30"
           />
+          <p id="founded-year-hint" className="mt-2 text-xs text-black/45">
+            Shown as &ldquo;Since &hellip;&rdquo; on your website. Leave blank
+            to hide it.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-black/10 bg-white/50 p-6">
+          <label className="text-sm font-medium" htmlFor="highlights">
+            Highlights line
+          </label>
+          <input
+            id="highlights"
+            type="text"
+            maxLength={80}
+            value={highlights}
+            onChange={(event) => setHighlights(event.target.value)}
+            placeholder="Fresh brews · Handpicked bakery · Comfort bites"
+            aria-describedby="highlights-hint"
+            className="mt-3 w-full rounded-xl border border-black/10 bg-white px-4 py-3 outline-none focus:border-black/30"
+          />
+          <p id="highlights-hint" className="mt-2 text-xs text-black/45">
+            The short line above your headline. Leave blank to hide it.
+          </p>
         </div>
 
         <div className="rounded-2xl border border-black/10 bg-white/50 p-6">
@@ -202,9 +244,18 @@ export default function CafeInformation() {
             className={inputClass}
           />
           <p className="mt-2 text-xs text-black/45">
-            Images must be hosted on {ALLOWED_IMAGE_HOSTS.join(" or ")}. Leave
-            blank to use the default photo.
+            {IMAGE_SOURCE_HINT} Leave blank to use the default photo. Remember
+            to save your changes.
           </p>
+          <ImageUpload
+            label="hero image"
+            disabled={saving}
+            onBusyChange={setUploading}
+            onUploaded={(url) => {
+              setHeroImage(url);
+              setStatus(null);
+            }}
+          />
         </div>
 
         <div className="rounded-2xl border border-black/10 bg-white/50 p-6">
@@ -314,10 +365,14 @@ export default function CafeInformation() {
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || uploading}
           className="rounded-full bg-[#1f1a17] px-6 py-3 text-sm font-medium text-white transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving ? "Saving..." : "Save Changes"}
+          {saving
+            ? "Saving..."
+            : uploading
+              ? "Waiting for photo..."
+              : "Save Changes"}
         </button>
       </div>
     </div>

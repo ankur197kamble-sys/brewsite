@@ -15,6 +15,8 @@ export const cafes = pgTable("cafes", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   foundedYear: integer("founded_year"),
+  /** Short line above the hero headline, e.g. "Fresh brews · Comfort bites". */
+  highlights: text("highlights"),
   tagline: text("tagline"),
   story: text("story"),
   storySecondary: text("story_secondary"),
@@ -148,6 +150,37 @@ export const offers = pgTable(
 );
 
 /**
+ * Every photo a café has uploaded to object storage (R2).
+ *
+ * The bucket holds the bytes; this table records which café owns each
+ * object, so storage can be audited, measured per café for billing, and
+ * cleaned up when a café leaves (the objects under `cafes/<id>/` can be
+ * removed using these keys). Deleting a café cascades these rows only — the
+ * objects themselves must be deleted from R2 separately.
+ */
+export const uploads = pgTable(
+  "uploads",
+  {
+    id: serial("id").primaryKey(),
+    cafeId: integer("cafe_id")
+      .notNull()
+      .references(() => cafes.id, { onDelete: "cascade" }),
+    /** Object key in the bucket, always `cafes/<cafeId>/<uuid>.<ext>`. */
+    key: text("key").notNull(),
+    url: text("url").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("uploads_key_unique_idx").on(table.key),
+    index("uploads_cafe_created_idx").on(table.cafeId, table.createdAt),
+  ],
+);
+
+/**
  * A user belongs to exactly one café. Every authenticated request resolves its
  * cafeId from here, never from client input.
  */
@@ -192,3 +225,4 @@ export type MenuItemRow = typeof menuItems.$inferSelect;
 export type UserRow = typeof users.$inferSelect;
 export type GalleryImageRow = typeof galleryImages.$inferSelect;
 export type OfferRow = typeof offers.$inferSelect;
+export type UploadRow = typeof uploads.$inferSelect;

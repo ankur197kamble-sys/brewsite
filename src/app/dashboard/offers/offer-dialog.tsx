@@ -1,7 +1,19 @@
 "use client";
 
-import { useEffect, useRef, type FormEvent } from "react";
-import { ALLOWED_IMAGE_HOSTS, parseImageUrl } from "@/app/lib/image-hosts";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+} from "react";
+import {
+  ALLOWED_IMAGE_HOSTS,
+  IMAGE_SOURCE_HINT,
+  parseImageUrl,
+} from "@/app/lib/image-hosts";
+import { ImageUpload } from "../image-upload";
 import { datesAreOrdered } from "@/app/lib/offers";
 import { ImagePreview } from "../image-preview";
 
@@ -25,7 +37,8 @@ type Props = {
   draft: OfferDraft | null;
   busy: boolean;
   error: string | null;
-  onChange: (draft: OfferDraft) => void;
+  /** The parent's state setter, so async updates can apply to the latest draft. */
+  onChange: Dispatch<SetStateAction<OfferDraft | null>>;
   onSubmit: (draft: OfferDraft) => void;
   onCancel: () => void;
 };
@@ -39,6 +52,7 @@ export function OfferDialog({
   onCancel,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -50,7 +64,7 @@ export function OfferDialog({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (draft) onSubmit(draft);
+    if (draft && !uploading) onSubmit(draft);
   }
 
   // Mirrors the server rules so problems surface before a round trip.
@@ -70,14 +84,15 @@ export function OfferDialog({
     ? datesAreOrdered(draft.startDate || null, draft.endDate || null)
     : true;
   const titleOk = draft ? draft.title.trim().length > 0 : false;
-  const canSubmit = !busy && titleOk && imageProblem === null && datesOk;
+  const canSubmit =
+    !busy && !uploading && titleOk && imageProblem === null && datesOk;
 
   return (
     <dialog
       ref={dialogRef}
       onClose={onCancel}
       aria-label={draft?.id === null ? "Add offer" : "Edit offer"}
-      className="w-[min(36rem,calc(100vw-2rem))] rounded-2xl border border-black/10 bg-[#f7f3ed] p-0 text-[#1f1a17] backdrop:bg-black/40"
+      className="m-auto w-[min(36rem,calc(100vw-2rem))] rounded-2xl border border-black/10 bg-[#f7f3ed] p-0 text-[#1f1a17] backdrop:bg-black/40"
     >
       {draft && (
         <form onSubmit={handleSubmit} className="p-6 md:p-8">
@@ -213,9 +228,16 @@ export function OfferDialog({
                   imageProblem ? "mt-2 text-xs text-red-900" : hintClass
                 }
               >
-                {imageProblem ??
-                  `Optional. Hosted on ${ALLOWED_IMAGE_HOSTS.join(" or ")}.`}
+                {imageProblem ?? `Optional. ${IMAGE_SOURCE_HINT}`}
               </p>
+              <ImageUpload
+                label="offer"
+                disabled={busy}
+                onBusyChange={setUploading}
+                onUploaded={(imageUrl) =>
+                  onChange((current) => current && { ...current, imageUrl })
+                }
+              />
             </div>
 
             <div>
