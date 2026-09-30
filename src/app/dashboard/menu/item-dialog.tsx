@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type FormEvent } from "react";
+import { ALLOWED_IMAGE_HOSTS, parseImageUrl } from "@/app/lib/image-hosts";
 import { parsePrice, type MenuCategoryView } from "@/app/lib/menu";
 
 export type ItemDraft = {
@@ -52,8 +53,16 @@ export function ItemDialog({
   }
 
   const priceIsValid = draft === null || parsePrice(draft.price) !== null;
+  // Same host rule the API enforces, so a bad link is caught before saving.
+  const checkedImage = draft ? parseImageUrl(draft.imageUrl, "Image URL") : null;
+  const imageProblem =
+    checkedImage && !checkedImage.ok ? checkedImage.error : null;
   const canSubmit =
-    draft !== null && draft.name.trim().length > 0 && priceIsValid && !busy;
+    draft !== null &&
+    draft.name.trim().length > 0 &&
+    priceIsValid &&
+    imageProblem === null &&
+    !busy;
 
   return (
     <dialog
@@ -162,13 +171,26 @@ export function ItemDialog({
               <input
                 id="item-image"
                 type="url"
-                placeholder="https://..."
+                placeholder={`https://${ALLOWED_IMAGE_HOSTS[0]}/...`}
                 value={draft.imageUrl}
                 onChange={(event) =>
                   onChange({ ...draft, imageUrl: event.target.value })
                 }
+                aria-invalid={imageProblem !== null}
+                aria-describedby="item-image-hint"
                 className={fieldClass}
               />
+              <p
+                id="item-image-hint"
+                className={
+                  imageProblem
+                    ? "mt-2 text-xs text-red-900"
+                    : "mt-2 text-xs text-black/45"
+                }
+              >
+                {imageProblem ??
+                  `Hosted on ${ALLOWED_IMAGE_HOSTS.join(" or ")}.`}
+              </p>
             </div>
 
             <label className="flex items-center gap-3 text-sm">

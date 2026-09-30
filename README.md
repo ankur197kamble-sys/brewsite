@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BrewSite
 
-## Getting Started
+A premium, mobile-first website platform for cafés. One codebase serves many
+cafés, each with its own content, dashboard and (eventually) domain.
 
-First, run the development server:
+- **Public site:** story, gallery, menu, offers and visit details, rendered on
+  the server from the database, with fallbacks when content is missing.
+- **Café dashboard** (`/dashboard`): café information, menu, gallery and
+  offers, each with create, edit, delete, reorder and publish/unpublish.
+- **Multi-tenant by design:** every dashboard action takes the café from the
+  signed-in session, never from the request.
+
+Stack: Next.js 16 · React 19 · TypeScript · Tailwind CSS 4 · Neon Postgres ·
+Drizzle ORM.
+
+## Setup
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Create `.env.local` with the database connection string (never commit it):
+   ```
+   DATABASE_URL=postgres://...
+   ```
+3. Sync the schema to the database:
+   ```bash
+   npm run db:push
+   ```
+4. Create a dashboard login for a café:
+   ```bash
+   npm run create-user -- owner@example.com "a-long-password" 1
+   ```
+5. Start the app at http://localhost:3000:
+   ```bash
+   npm run dev
+   ```
+
+## Tests and checks
+
+With `npm run dev` running in another terminal:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm test               # menu + offers end-to-end suites
+npm run test:menu
+npm run test:offers
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The suites call the real HTTP API as two throwaway `[test]` cafés, including
+cross-tenant attacks, and delete everything they create. They refuse to run
+against anything other than localhost.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Before merging:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npx tsc --noEmit
+npx eslint .
+npx next build
+```
 
-## Learn More
+## Project layout
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/app/page.tsx          public homepage
+src/app/dashboard/        café dashboard
+src/app/api/              API routes (auth, cafe, menu, gallery, offers)
+src/app/db/               schema and tenant-scoped data access
+src/app/lib/              validation, auth, sessions, image-host allowlist
+scripts/                  admin scripts and test suites
+docs/                     development notebook
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Images may only come from hosts listed in `src/app/lib/image-hosts.ts`. The
+same list drives API validation and `next/image`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See [docs/DEVELOPMENT_NOTEBOOK.md](docs/DEVELOPMENT_NOTEBOOK.md) for the
+milestone history and design decisions.

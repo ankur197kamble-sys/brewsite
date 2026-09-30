@@ -1,5 +1,6 @@
 import type { MenuItem as StaticMenuItem } from "@/app/data/cafe";
 import { asRecord } from "@/app/lib/json";
+import { parseImageUrl } from "@/app/lib/image-hosts";
 import { invalid, parseId, type Validated } from "@/app/lib/validation";
 
 // Re-exported so existing importers of these generic helpers keep working.
@@ -12,7 +13,6 @@ export const CURRENCY_SYMBOL = "₹";
 const MAX_NAME_LENGTH = 120;
 const MAX_CATEGORY_NAME_LENGTH = 80;
 const MAX_DESCRIPTION_LENGTH = 500;
-const MAX_IMAGE_URL_LENGTH = 2048;
 /** Ceiling implied by the numeric(10, 2) price column. */
 const MAX_PRICE = 99_999_999.99;
 
@@ -99,24 +99,6 @@ function parseOptionalText(
   return { ok: true, value: trimmed };
 }
 
-/** Only http(s) URLs — this value is rendered into an image src. */
-function parseImageUrl(
-  value: unknown,
-): { ok: true; value: string | null } | { ok: false } {
-  const text = parseOptionalText(value, MAX_IMAGE_URL_LENGTH);
-  if (!text.ok) return { ok: false };
-  if (text.value === null) return { ok: true, value: null };
-
-  try {
-    const url = new URL(text.value);
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-      return { ok: false };
-    }
-    return { ok: true, value: url.toString() };
-  } catch {
-    return { ok: false };
-  }
-}
 
 export function validateCategoryInput(body: unknown): Validated<CategoryInput> {
   const record = asRecord(body);
@@ -159,8 +141,8 @@ export function validateMenuItemInput(body: unknown): Validated<MenuItemInput> {
     );
   }
 
-  const imageUrl = parseImageUrl(record.imageUrl);
-  if (!imageUrl.ok) return invalid("Image URL must be a valid http(s) URL");
+  const imageUrl = parseImageUrl(record.imageUrl, "Image URL");
+  if (!imageUrl.ok) return invalid(imageUrl.error);
 
   const isPublished =
     record.isPublished === undefined ? true : record.isPublished === true;
@@ -225,8 +207,8 @@ export function validateMenuItemPatch(
   }
 
   if (record.imageUrl !== undefined) {
-    const imageUrl = parseImageUrl(record.imageUrl);
-    if (!imageUrl.ok) return invalid("Image URL must be a valid http(s) URL");
+    const imageUrl = parseImageUrl(record.imageUrl, "Image URL");
+    if (!imageUrl.ok) return invalid(imageUrl.error);
     patch.imageUrl = imageUrl.value;
   }
 

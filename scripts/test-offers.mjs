@@ -14,116 +14,25 @@
  * it briefly inserts a few "[test]" offers for café #1 and removes them in
  * the same cleanup. Nothing else belonging to café #1 is touched.
  */
-import { randomBytes } from "node:crypto";
 import { inArray } from "drizzle-orm";
 import { db } from "../src/app/db/index.ts";
-import { cafes, offers, users } from "../src/app/db/schema.ts";
-import { hashPassword } from "../src/app/lib/auth.ts";
+import { offers } from "../src/app/db/schema.ts";
+import {
+  call,
+  check,
+  createTenant,
+  expectStatus,
+  finish,
+  onCleanup,
+  section,
+  tag,
+} from "./lib/harness.mjs";
 
-const BASE_URL = process.argv[2] ?? "http://localhost:3000";
 const PUBLIC_CAFE_ID = 1;
-
-if (!/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(BASE_URL)) {
-  console.error(`✗ Refusing to run against ${BASE_URL}: local dev servers only.`);
-  process.exit(1);
-}
-
-const run = randomBytes(4).toString("hex");
-const tag = (label) => `Test ${run} ${label}`;
-
-let passed = 0;
-const failures = [];
-
-function check(name, condition, detail = "") {
-  if (condition) {
-    passed += 1;
-    console.log(`  ✓ ${name}`);
-  } else {
-    failures.push(name);
-    console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ""}`);
-  }
-}
-
-function section(title) {
-  console.log(`\n${title}`);
-}
-
-async function call(method, path, { cookie, body, raw } = {}) {
-  const response = await fetch(`${BASE_URL}${path}`, {
-    method,
-    redirect: "manual",
-    headers: {
-      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-      ...(cookie ? { Cookie: cookie } : {}),
-    },
-    body: raw ?? (body === undefined ? undefined : JSON.stringify(body)),
-  });
-
-  const text = await response.text();
-  let json = null;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    // HTML pages and redirects are not JSON.
-  }
-
-  return { status: response.status, json, text, headers: response.headers };
-}
-
-const expectStatus = (name, result, status) =>
-  check(name, result.status === status, `expected ${status}, got ${result.status} ${result.json?.message ?? ""}`);
-
-async function login(email, password) {
-  const response = await fetch(`${BASE_URL}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-
-  const cookie = response.headers
-    .getSetCookie()
-    .map((header) => header.split(";")[0])
-    .find((pair) => pair.startsWith("brewsite_session="));
-
-  if (!response.ok || !cookie) throw new Error(`Login failed for test user (${response.status})`);
-  return cookie;
-}
 
 async function listOffers(cookie) {
   const result = await call("GET", "/api/offers", { cookie });
   return result.json?.data?.offers ?? [];
-}
-
-/* ------------------------------------------------------------------ setup */
-
-const createdCafeIds = [];
-const publicOfferIds = [];
-
-async function createTenant(label) {
-  const [cafe] = await db
-    .insert(cafes)
-    .values({ name: `[test] Offers ${label} ${run}` })
-    .returning({ id: cafes.id });
-  createdCafeIds.push(cafe.id);
-
-  const email = `offers-${label.toLowerCase()}-${run}@brewsite.test`;
-  const password = randomBytes(18).toString("base64url");
-  await db.insert(users).values({
-    cafeId: cafe.id,
-    email,
-    passwordHash: await hashPassword(password),
-  });
-
-  return { cafeId: cafe.id, cookie: await login(email, password) };
-}
-
-async function cleanup() {
-  if (publicOfferIds.length > 0) {
-    await db.delete(offers).where(inArray(offers.id, publicOfferIds));
-  }
-  if (createdCafeIds.length > 0) {
-    await db.delete(cafes).where(inArray(cafes.id, createdCafeIds));
-  }
 }
 
 /* ------------------------------------------------------------------ tests */
@@ -142,8 +51,8 @@ async function main() {
     `got ${dashboard.status}`,
   );
 
-  const a = await createTenant("A");
-  const b = await createTenant("B");
+  const a = await createTenant("Offers A");
+  const b = await createTenant("Offers B");
 
   section("Validation (café A)");
   const invalidBodies = [
@@ -270,6 +179,10 @@ async function main() {
   check("shows café A's offers", page.text.includes(specs.live.title));
   check("does not show café B's offers", !page.text.includes(tag("B own")));
   check("shows Live / Scheduled / Ended badges", ["Live", "Scheduled", "Ended"].every((label) => page.text.includes(`>${label}<`)));
+  const overview = await call("GET", "/dashboard", { cookie: a.cookie });
+  const overviewText = overview.text.replaceAll("<!-- -->", "");
+  check("overview counts live offers (2 of 4)", overviewText.includes("2 of 4 live"));
+  check("overview reports demo gallery for a café with none", overviewText.includes("Demo gallery"));
 
   section("Delete (café A)");
   expectStatus("delete → 200", await call("DELETE", `/api/offers/${created.ended.id}`, { cookie: a.cookie }), 200);
@@ -291,7 +204,8 @@ async function main() {
     .insert(offers)
     .values(Object.values(publicSpecs).map((spec, index) => ({ cafeId: PUBLIC_CAFE_ID, sortOrder: 10_000 + index, ...spec })))
     .returning({ id: offers.id });
-  publicOfferIds.push(...inserted.map((row) => row.id));
+  const insertedIds = inserted.map((row) => row.id);
+  onCleanup(() => db.delete(offers).where(inArray(offers.id, insertedIds)));
 
   const home = await call("GET", "/");
   // React separates adjacent text nodes with <!-- --> in server HTML.
@@ -307,20 +221,4 @@ async function main() {
   check("other cafés' offers are never shown", !home.text.includes(specs.live.title) && !home.text.includes(tag("B own")));
 }
 
-try {
-  await main();
-} catch (error) {
-  failures.push(`crashed: ${error instanceof Error ? error.message : String(error)}`);
-  console.error("\n✗ Test run crashed:", error);
-} finally {
-  try {
-    await cleanup();
-    console.log("\nCleaned up test cafés, users, sessions and offers.");
-  } catch (error) {
-    console.error("\n✗ Cleanup failed — remove '[test] Offers …' cafés manually:", error);
-    failures.push("cleanup");
-  }
-}
-
-console.log(`\n${passed} passed, ${failures.length} failed`);
-process.exit(failures.length === 0 ? 0 : 1);
+await finish(main);
