@@ -30,6 +30,9 @@ export async function PATCH(request: Request, context: Context) {
       const moved = await moveGalleryImage(cafeId, imageId, move);
       if (moved === "not_found") return apiError("Gallery image not found", 404);
       if (moved === "edge") return apiError("Image cannot move further", 400);
+      if (moved === "conflict") {
+        return apiError("The gallery changed. Please refresh and try again.", 409);
+      }
       return apiSuccess({ moved: true });
     }
 

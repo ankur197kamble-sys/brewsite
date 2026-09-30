@@ -17,9 +17,11 @@ export type MoveDirection = "up" | "down";
 /**
  * Outcome of a one-step move. "not_found" covers ids that belong to another
  * café, so a cross-tenant move answers 404 exactly like every other
- * cross-tenant request; "edge" means the row is already first or last.
+ * cross-tenant request; "edge" means the row is already first or last;
+ * "conflict" means the list changed underneath the move (a concurrent add
+ * or delete), so the caller should refresh and retry.
  */
-export type MoveResult = "moved" | "edge" | "not_found";
+export type MoveResult = "moved" | "edge" | "not_found" | "conflict";
 
 /** Accepts a route param string or a JSON number; rejects anything else. */
 export function parseId(value: unknown): number | null {

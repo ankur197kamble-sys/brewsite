@@ -23,7 +23,25 @@ export const run = randomBytes(4).toString("hex");
 export const tag = (label) => `Test ${run} ${label}`;
 
 let passed = 0;
+let interrupted = false;
 const failures = [];
+
+/**
+ * Ctrl+C only raises a flag. A request already in flight finishes and
+ * registers what it created, the next request stops the run, and cleanup then
+ * runs exactly once from finish() with complete lists. Suites that insert
+ * rows for the real public café rely on this. A second Ctrl+C falls back to
+ * Node's default immediate exit.
+ */
+process.once("SIGINT", () => {
+  interrupted = true;
+  console.error("\nInterrupted — stopping after the current step, then cleaning up (Ctrl+C again to force quit)...");
+});
+
+/** Call before any request a suite makes outside call()/createTenant(). */
+export function stopIfInterrupted() {
+  if (interrupted) throw new Error("Interrupted");
+}
 const createdCafeIds = [];
 const cleanupSteps = [];
 
@@ -42,6 +60,7 @@ export function section(title) {
 }
 
 export async function call(method, path, { cookie, body, raw } = {}) {
+  stopIfInterrupted();
   const response = await fetch(`${BASE_URL}${path}`, {
     method,
     redirect: "manual",
@@ -84,6 +103,7 @@ async function login(email, password) {
 
 /** A throwaway café with one signed-in user. */
 export async function createTenant(label) {
+  stopIfInterrupted();
   const [cafe] = await db
     .insert(cafes)
     .values({ name: `[test] ${label} ${run}` })
@@ -114,14 +134,9 @@ export function onCleanup(step) {
 /**
  * Runs every registered cleanup step, each isolated so one failure cannot
  * skip the rest, and always deletes the test cafés last (which cascades to
- * their users, sessions, menu, gallery, offers and upload rows). Safe to call
- * twice; only the first call does anything.
+ * their users, sessions, menu, gallery, offers and upload rows).
  */
-let cleanedUp = false;
 async function cleanup() {
-  if (cleanedUp) return true;
-  cleanedUp = true;
-
   let ok = true;
   for (const step of cleanupSteps) {
     try {
@@ -145,14 +160,6 @@ async function cleanup() {
   return ok;
 }
 
-// Ctrl+C mid-run must not leave test rows behind (some suites briefly add
-// rows to the real public café).
-process.once("SIGINT", async () => {
-  console.error("\nInterrupted — cleaning up before exit...");
-  await cleanup();
-  process.exit(130);
-});
-
 /** Runs the tests, always cleans up, prints the summary and exits. */
 export async function finish(main) {
   try {
@@ -165,5 +172,5 @@ export async function finish(main) {
   }
 
   console.log(`\n${passed} passed, ${failures.length} failed`);
-  process.exit(failures.length === 0 ? 0 : 1);
+  process.exit(interrupted ? 130 : failures.length === 0 ? 0 : 1);
 }

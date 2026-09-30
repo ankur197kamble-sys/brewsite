@@ -185,5 +185,5 @@ export async function moveGalleryImage(
   [ids[index], ids[target]] = [ids[target], ids[index]];
 
   const result = await reorderGallery(cafeId, ids);
-  return result.status === "ok" ? "moved" : "not_found";
+  return result.status === "ok" ? "moved" : "conflict";
 }

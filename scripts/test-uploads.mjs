@@ -22,6 +22,7 @@ import {
   finish,
   onCleanup,
   section,
+  stopIfInterrupted,
   testCafeIds,
 } from "./lib/harness.mjs";
 
@@ -42,6 +43,7 @@ const JPEG_HEADER = [0xff, 0xd8, 0xff, 0xe0];
 const WEBP_HEADER = [...Buffer.from("RIFF"), 0, 0, 0, 0, ...Buffer.from("WEBPVP8 ")];
 
 async function upload(cookie, content, { type = "application/octet-stream", name = "photo", field = "file" } = {}) {
+  stopIfInterrupted();
   const form = new FormData();
   if (content !== null) form.append(field, new Blob([content], { type }), name);
 

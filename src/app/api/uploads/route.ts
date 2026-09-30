@@ -127,20 +127,30 @@ export async function POST(request: Request) {
       sizeBytes: bytes.byteLength,
     });
 
-    if ((await countUploadsSince(cafeId, since())) > DAILY_UPLOAD_LIMIT) {
-      await deleteUpload(cafeId, upload.id);
-      return apiError(LIMIT_MESSAGE, 429);
-    }
-
+    // From here on, any exit other than success releases the reservation,
+    // so a refused, failed or crashed upload never uses up the daily limit.
+    let stored = false;
     try {
-      await putObject(key, bytes, contentType);
-    } catch (error) {
-      console.error("Failed to store upload in R2:", error);
-      await deleteUpload(cafeId, upload.id);
-      return apiError("The photo could not be stored. Please try again.", 502);
-    }
+      if ((await countUploadsSince(cafeId, since())) > DAILY_UPLOAD_LIMIT) {
+        return apiError(LIMIT_MESSAGE, 429);
+      }
 
-    return apiSuccess(upload, 201);
+      try {
+        await putObject(key, bytes, contentType);
+      } catch (error) {
+        console.error("Failed to store upload in R2:", error);
+        return apiError("The photo could not be stored. Please try again.", 502);
+      }
+
+      stored = true;
+      return apiSuccess(upload, 201);
+    } finally {
+      if (!stored) {
+        await deleteUpload(cafeId, upload.id).catch((error) =>
+          console.error("Failed to release upload reservation:", error),
+        );
+      }
+    }
   } catch (error) {
     console.error("Upload failed:", error);
     return apiError("Upload failed", 500);

@@ -189,5 +189,5 @@ export async function moveOffer(
   [ids[index], ids[target]] = [ids[target], ids[index]];
 
   const result = await reorderOffers(cafeId, ids);
-  return result.status === "ok" ? "moved" : "not_found";
+  return result.status === "ok" ? "moved" : "conflict";
 }

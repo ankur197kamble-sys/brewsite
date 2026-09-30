@@ -57,7 +57,7 @@ async function preparePhoto(file: File): Promise<Blob> {
   // A browser that cannot encode WebP silently returns PNG, which is far too
   // large for photos — fall back to JPEG instead.
   let blob = await encode("image/webp", 0.85);
-  if (!blob || blob.type !== "image/webp") {
+  if (!blob || blob.type !== "image/webp" || blob.size > MAX_UPLOAD_BYTES) {
     // JPEG has no transparency: without a backdrop, transparent pixels
     // (a PNG logo, say) would turn black. Paint white behind the image.
     context.globalCompositeOperation = "destination-over";

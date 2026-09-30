@@ -56,6 +56,9 @@ function objectUrl(config: R2Config, key: string): string {
 
 export class R2Error extends Error {}
 
+/** Includes aws4fetch's own retries on 5xx/429 responses. */
+const R2_TIMEOUT_MS = 20_000;
+
 /**
  * Stores an object. Keys are unique per upload, so the object can be cached
  * forever by browsers and the image optimiser.
@@ -70,6 +73,8 @@ export async function putObject(
 
   const response = await r2.aws.fetch(objectUrl(r2.config, key), {
     method: "PUT",
+    // Bounded, so a hung storage request cannot hold the upload open.
+    signal: AbortSignal.timeout(R2_TIMEOUT_MS),
     body: body as unknown as BodyInit,
     headers: {
       "Content-Type": contentType,
@@ -89,6 +94,7 @@ export async function deleteObject(key: string): Promise<void> {
 
   const response = await r2.aws.fetch(objectUrl(r2.config, key), {
     method: "DELETE",
+    signal: AbortSignal.timeout(R2_TIMEOUT_MS),
   });
 
   if (!response.ok && response.status !== 404) {
