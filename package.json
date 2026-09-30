@@ -10,7 +10,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "create-user": "node --env-file=.env.local scripts/create-user.mjs",
-    "backfill-gallery": "node --env-file=.env.local scripts/backfill-gallery.mjs"
+    "backfill-gallery": "node --env-file=.env.local scripts/backfill-gallery.mjs",
+    "test:offers": "node --env-file=.env.local scripts/test-offers.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

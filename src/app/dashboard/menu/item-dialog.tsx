@@ -60,7 +60,7 @@ export function ItemDialog({
       ref={dialogRef}
       onClose={onCancel}
       aria-label={draft?.id === null ? "Add menu item" : "Edit menu item"}
-      className="w-[min(34rem,calc(100vw-2rem))] rounded-2xl border border-black/10 bg-[#f7f3ed] p-0 text-[#1f1a17] backdrop:bg-black/40"
+      className="m-auto w-[min(34rem,calc(100vw-2rem))] rounded-2xl border border-black/10 bg-[#f7f3ed] p-0 text-[#1f1a17] backdrop:bg-black/40"
     >
       {draft && (
         <form onSubmit={handleSubmit} className="p-6 md:p-8">
