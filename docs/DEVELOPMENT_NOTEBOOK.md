@@ -25,6 +25,7 @@ from the git history and the project handoff, not written up in full.
 | — | 2026-09-30 | `61ee612` | PR #1 merged: all of the above reaches `main` on GitHub |
 | 8 | 2026-09-30 | branch `offers-verification` | Offers verification, repeatable tests, four fixes (below) |
 | 9 | 2026-09-30 | branch `photo-uploads` | Photo uploads to Cloudflare R2 |
+| 10 | 2026-09-30 | branch `coffee-gruham` | First real café: Coffee Gruham onboarded; facts never faked; menu importer |
 
 ---
 
@@ -466,3 +467,112 @@ message either way.
    values, and run `npm run test:uploads` for the full round trip.
 2. Merge `offers-verification`, then `photo-uploads`.
 3. Then deployment to Vercel with a real domain.
+
+---
+
+## Milestone 10: First real café, Coffee Gruham
+
+### Objective
+Replace the demo content of café #1 with the first real customer, Coffee
+Gruham (Katrap, Badlapur E), using photos of their printed menu. Fix every
+place the platform would have shown demo data as if it were theirs.
+
+### Starting state
+Branch `coffee-gruham`, from `photo-uploads`. Café #1 held demo content: name
+"Brewsite Neon Test 2", a London address, made-up hours, "Since 2018", a
+placeholder phone number, and 5 demo menu items.
+
+### Data applied (café #1)
+- **From the menu card:**
+  - name: Coffee Gruham
+  - highlights: "Fresh Brews · Handpicked Bakery · Comfort Bites"
+  - headline: the motto "Coffee एवं परम् सुखम्"
+  - address: Shop No. 4, Gite Chowk, Vedant Kalp Apt, Opp. Hitachi ATM,
+    Katrap, Badlapur (E)
+  - phone number (as printed)
+  - Instagram: @coffeegruham
+- **Maps link:** a Google Maps search built from the printed address.
+- **Story text:** written only from facts on the card, including "run by
+  Brewbean Ventures". The owner can edit it in the dashboard.
+- **Deliberately left empty, because the card does not state them:**
+  - opening hours
+  - founding year
+  - WhatsApp (the printed number may not be on WhatsApp)
+  - minimum order (the value was hidden by glare)
+- **Menu:** 12 categories and 77 items in the order printed. 66 are live.
+  - 11 were imported **hidden** because glare made their prices unreadable:
+    Chicken Salad Bowl, six veg momos, both Volcano Kiss mocktails, and both
+    ice teas (entered at ₹0).
+  - The 5 demo items were hidden, not deleted. "Coffee & Espresso" and
+    "Pastries" were kept for the café's real coffee and bakery items; that
+    page was not legible in the photos.
+- **Backup:** the pre-import row and menu are saved in
+  `onboarding/backup-cafe1-before-coffee-gruham.json` (git-ignored).
+
+### Platform changes
+1. **Facts are never faked.** Once a café has its own record, the founding
+   year, address, hours, phone, WhatsApp, Instagram and maps link come only
+   from that record, and are hidden when empty. Only presentational fields
+   (headline, story, photos) still fall back to demo content.
+   - `getSiteCafe` now returns a `SiteCafe` type with those fields nullable.
+2. **Dashboard trap removed.** The Café Information form used to pre-fill
+   empty hours and address with demo values, so one Save published them. It
+   now loads them empty. The API stores an empty address as empty, and a
+   founding year of 0 or an implausible year as unknown (the site showed
+   "Since 0" before).
+3. **New `highlights` field:** the line above the hero headline, replacing
+   the hard-coded "Specialty coffee". There is a new dashboard field for it.
+   The API only changes it when the field is sent.
+4. **Contact:** a new **Call** button (`tel:`). The WhatsApp button only
+   shows when a WhatsApp number exists, and `wa.me` links strip non-digits.
+   The footer shows "© year café name".
+5. **Page title and description** come from the café, via
+   `generateMetadata`. The café is loaded once per request through React
+   `cache`.
+6. **Menus of any size.** Menus with more than 16 items get:
+   - compact rows
+   - two balanced columns on desktop (CSS columns)
+   - a sticky, horizontally scrollable category bar with 44 px tap targets
+
+   The result: 7,252 px → 5,560 px on a phone, and 3,258 px on desktop.
+   `<main>` changed from `overflow-hidden` to `overflow-x-clip`, because
+   `overflow: hidden` creates a scroll container and stopped the bar from
+   sticking.
+7. **`scripts/import-cafe.mjs`** (`npm run import-cafe`): a reusable
+   onboarding importer.
+   - It shows a dry run by default and writes only with `--apply`.
+   - It validates everything and scopes every query to the target café.
+   - Re-running matches items by name, so it is idempotent.
+   - With `hideMissing` it hides items instead of deleting them.
+8. **`scripts/test-cafe.mjs`** (19 checks): highlights, founding-year
+   handling, empty facts never replaced by demo data, and cross-café saves.
+
+### Also in this branch
+A second independent review of the part-2 fixes confirmed 4 low-severity
+issues, all fixed in commit `2e3ac0d`:
+- an oversized WebP now falls back to JPEG
+- the upload reservation is released on every failure, and R2 calls time out
+- a move that races another change returns 409, not 404
+- the harness handles Ctrl+C by stopping the run, then cleaning up once
+
+### Tests
+- `npm test`: café 19, menu 46, offers 82, uploads 22, **169 checks**, all
+  passing.
+- `tsc`, `eslint` and `next build` pass.
+- Browser, at 375 px and 1280 px:
+  - The hero shows the highlights and the Devanagari motto.
+  - The menu jump links work, and the category bar sticks and releases.
+  - Nothing overflows sideways.
+  - The Visit section shows the address, Directions and Call.
+  - The dashboard form loads empty facts empty, and saves them without
+    demo data.
+
+### For the owner to confirm
+1. The 11 hidden prices, then click **Show** in the dashboard.
+2. Opening hours, founding year, and whether their phone number is on WhatsApp.
+3. Their exact Google Maps business link, and the minimum order value.
+4. The coffee and bakery page: a clear photo is needed.
+5. Real photos for the hero and gallery, which are still demo images. They
+   can be uploaded once R2 is configured.
+6. The spelling of the motto, and the sandwich prices, which were small
+   print.

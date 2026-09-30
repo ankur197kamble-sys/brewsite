@@ -15,6 +15,8 @@ export const cafes = pgTable("cafes", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   foundedYear: integer("founded_year"),
+  /** Short line above the hero headline, e.g. "Fresh brews · Comfort bites". */
+  highlights: text("highlights"),
   tagline: text("tagline"),
   story: text("story"),
   storySecondary: text("story_secondary"),

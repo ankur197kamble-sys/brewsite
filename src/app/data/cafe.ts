@@ -7,6 +7,8 @@ export type MenuItem = {
 export type Cafe = {
   name: string;
   foundedYear: number;
+  /** Short line above the headline, e.g. what the café is known for. */
+  highlights: string;
   tagline: string;
   whatsapp: string;
   mapsUrl: string;
@@ -25,6 +27,7 @@ export const cafe: Cafe = {
   name: "Brewsite Café",
 
   foundedYear: 2018,
+  highlights: "Specialty coffee",
   whatsapp: "917219282659",
   phone: "917219282659",
   instagram: "https://instagram.com/",

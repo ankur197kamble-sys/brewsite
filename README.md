@@ -45,6 +45,23 @@ Drizzle ORM.
    npm run dev
    ```
 
+## Onboarding a café's menu
+
+Transcribe the café's details and printed menu into a JSON file under
+`onboarding/`, which is git-ignored because customer data belongs in the
+database, not this public repository. The format is documented at the top of
+`scripts/import-cafe.mjs`. Then:
+
+```bash
+npm run import-cafe -- 1 onboarding/my-cafe.json            # dry run: shows every change
+npm run import-cafe -- 1 onboarding/my-cafe.json --apply    # writes it
+```
+
+Re-running updates items in place and never duplicates them. With
+`"hideMissing": true`, items not in the file are hidden, never deleted. Mark
+any price you could not read with `"published": false` and a `"note"`: it is
+imported hidden, and the owner confirms it in the dashboard.
+
 ## Photo uploads (Cloudflare R2)
 
 Owners can upload their own photos for the hero image, gallery, offers and
