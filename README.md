@@ -110,6 +110,30 @@ file's bytes, not its name), and 100 uploads per café per day. Image links
 must be https (http links are upgraded automatically); links to the photo
 bucket must point inside `/cafes/` and carry no `?query`.
 
+## Deploying (Vercel)
+
+1. Sign in at [vercel.com](https://vercel.com) with GitHub, then choose
+   **Add New → Project** and import this repository. Next.js is detected
+   automatically.
+2. The project name becomes the address (`<name>.vercel.app`).
+3. Under **Environment Variables**, add:
+   - `DATABASE_URL`: the same value as in `.env.local`. Paste it only into
+     Vercel.
+   - `SITE_PREVIEW` = `true` while the café is not yet a customer: every page
+     is marked `noindex` so search engines never list the demo.
+   - The five R2 variables, once photo uploads are set up.
+4. Click **Deploy**.
+
+`vercel.json` pins the server functions to Singapore (`sin1`), next to the
+Neon database, so each page's database queries stay in one region.
+
+Environment variables are read at build time, so after changing one (for
+example removing `SITE_PREVIEW` when the café signs up), use **Deployments →
+Redeploy**.
+
+Vercel's free Hobby plan is for non-commercial use. Move the project to Pro
+before charging a café for the site.
+
 ## Tests and checks
 
 With `npm run dev` running in another terminal:

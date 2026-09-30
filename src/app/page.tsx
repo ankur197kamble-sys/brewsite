@@ -23,6 +23,7 @@ import {
   whatsappHref,
   type DbCafe,
 } from "@/app/lib/site-cafe";
+import { isPreview } from "@/app/lib/site-mode";
 import { getPublicCafeId } from "@/app/lib/tenant";
 
 export const dynamic = "force-dynamic";
@@ -67,6 +68,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description: siteCafe.highlights
       ? `${siteCafe.highlights}. ${siteCafe.tagline}`
       : siteCafe.tagline,
+    ...(isPreview ? { robots: { index: false, follow: false } } : {}),
   };
 }
 

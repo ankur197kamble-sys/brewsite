@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { IMAGE_SOURCES } from "./src/app/lib/image-hosts";
+import { isPreview } from "./src/app/lib/site-mode";
 
 const nextConfig: NextConfig = {
   images: {
@@ -12,6 +13,18 @@ const nextConfig: NextConfig = {
       ...(pathPrefix ? { pathname: `${pathPrefix}**` } : {}),
       ...(noQuery ? { search: "" } : {}),
     })),
+  },
+
+  async headers() {
+    // Preview mode: keep every response (pages and optimised images alike)
+    // out of search results. See src/app/lib/site-mode.ts.
+    if (!isPreview) return [];
+    return [
+      {
+        source: "/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+    ];
   },
 };
 
