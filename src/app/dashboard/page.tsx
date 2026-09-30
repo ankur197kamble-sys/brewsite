@@ -3,6 +3,7 @@ import { getCafe } from "@/app/db/cafe";
 import { getGallery } from "@/app/db/gallery";
 import { getMenu } from "@/app/db/menu";
 import { getOffers } from "@/app/db/offers";
+import { normalizeStringList } from "@/app/lib/json";
 import { offerStatus } from "@/app/lib/offers";
 import { requireCafeSession } from "@/app/lib/session";
 import { getSiteCafe } from "@/app/lib/site-cafe";
@@ -23,6 +24,8 @@ export default async function Dashboard() {
   const items = categories.flatMap((category) => category.items);
   const publishedCount = items.filter((item) => item.isPublished).length;
   const visibleImages = gallery.filter((image) => image.isPublished).length;
+  // The raw legacy column, without the demo fallback getSiteCafe mixes in.
+  const legacyImages = normalizeStringList(dbCafe?.galleryImages, []).length;
   const liveOffers = offers.filter(
     (offer) => offerStatus(offer) === "live",
   ).length;
@@ -38,13 +41,15 @@ export default async function Dashboard() {
           : `${publishedCount} of ${items.length} visible`,
     },
     {
-      // Mirrors the public fallback: with nothing published, the site shows
-      // the legacy/demo photos rather than an empty gallery.
+      // Mirrors the public fallback chain: published gallery photos, then the
+      // café's older photo list, then the demo photos.
       label: "Gallery images",
       value:
-        visibleImages === 0
-          ? "Demo gallery"
-          : `${visibleImages} of ${gallery.length} visible`,
+        visibleImages > 0
+          ? `${visibleImages} of ${gallery.length} visible`
+          : legacyImages > 0
+            ? `${legacyImages} older photo${legacyImages === 1 ? "" : "s"}`
+            : "Demo gallery",
     },
     {
       label: "Offers",

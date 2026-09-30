@@ -28,7 +28,8 @@ export async function PATCH(request: Request, context: Context) {
     const move = parseMoveDirection(body);
     if (move) {
       const moved = await moveGalleryImage(cafeId, imageId, move);
-      if (!moved) return apiError("Image cannot move further", 400);
+      if (moved === "not_found") return apiError("Gallery image not found", 404);
+      if (moved === "edge") return apiError("Image cannot move further", 400);
       return apiSuccess({ moved: true });
     }
 

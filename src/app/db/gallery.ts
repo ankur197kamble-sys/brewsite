@@ -2,7 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/app/db";
 import { galleryImages, type GalleryImageRow } from "@/app/db/schema";
 import type { GalleryImageInput, GalleryImageView } from "@/app/lib/gallery";
-import type { MoveDirection } from "@/app/lib/validation";
+import type { MoveDirection, MoveResult } from "@/app/lib/validation";
 
 /**
  * Every function takes an explicit cafeId and filters on it, exactly like the
@@ -168,7 +168,7 @@ export async function moveGalleryImage(
   cafeId: number,
   imageId: number,
   direction: MoveDirection,
-): Promise<boolean> {
+): Promise<MoveResult> {
   const current = await db
     .select({ id: galleryImages.id })
     .from(galleryImages)
@@ -177,13 +177,13 @@ export async function moveGalleryImage(
 
   const ids = current.map((row) => row.id);
   const index = ids.indexOf(imageId);
-  if (index === -1) return false;
+  if (index === -1) return "not_found";
 
   const target = direction === "up" ? index - 1 : index + 1;
-  if (target < 0 || target >= ids.length) return false;
+  if (target < 0 || target >= ids.length) return "edge";
 
   [ids[index], ids[target]] = [ids[target], ids[index]];
 
   const result = await reorderGallery(cafeId, ids);
-  return result.status === "ok";
+  return result.status === "ok" ? "moved" : "not_found";
 }

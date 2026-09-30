@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+} from "react";
 import {
   ALLOWED_IMAGE_HOSTS,
   IMAGE_SOURCE_HINT,
@@ -28,7 +35,8 @@ type Props = {
   categories: MenuCategoryView[];
   busy: boolean;
   error: string | null;
-  onChange: (draft: ItemDraft) => void;
+  /** The parent's state setter, so async updates can apply to the latest draft. */
+  onChange: Dispatch<SetStateAction<ItemDraft | null>>;
   onSubmit: (draft: ItemDraft) => void;
   onCancel: () => void;
 };
@@ -43,6 +51,7 @@ export function ItemDialog({
   onCancel,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -54,7 +63,7 @@ export function ItemDialog({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (draft) onSubmit(draft);
+    if (draft && !uploading) onSubmit(draft);
   }
 
   const priceIsValid = draft === null || parsePrice(draft.price) !== null;
@@ -67,7 +76,8 @@ export function ItemDialog({
     draft.name.trim().length > 0 &&
     priceIsValid &&
     imageProblem === null &&
-    !busy;
+    !busy &&
+    !uploading;
 
   return (
     <dialog
@@ -198,7 +208,10 @@ export function ItemDialog({
               <ImageUpload
                 label="menu item"
                 disabled={busy}
-                onUploaded={(imageUrl) => onChange({ ...draft, imageUrl })}
+                onBusyChange={setUploading}
+                onUploaded={(imageUrl) =>
+                  onChange((current) => current && { ...current, imageUrl })
+                }
               />
             </div>
 

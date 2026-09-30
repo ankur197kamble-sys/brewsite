@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+} from "react";
 import { ImagePreview } from "../image-preview";
 import {
   ALLOWED_IMAGE_HOSTS,
@@ -23,7 +30,8 @@ type Props = {
   draft: ImageDraft | null;
   busy: boolean;
   error: string | null;
-  onChange: (draft: ImageDraft) => void;
+  /** The parent's state setter, so async updates can apply to the latest draft. */
+  onChange: Dispatch<SetStateAction<ImageDraft | null>>;
   onSubmit: (draft: ImageDraft) => void;
   onCancel: () => void;
 };
@@ -37,6 +45,7 @@ export function ImageDialog({
   onCancel,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -48,7 +57,7 @@ export function ImageDialog({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (draft) onSubmit(draft);
+    if (draft && !uploading) onSubmit(draft);
   }
 
   // Same rule the API enforces, so the preview only shows a URL that will save.
@@ -108,7 +117,10 @@ export function ImageDialog({
               <ImageUpload
                 label="gallery image"
                 disabled={busy}
-                onUploaded={(url) => onChange({ ...draft, url })}
+                onBusyChange={setUploading}
+                onUploaded={(url) =>
+                  onChange((current) => current && { ...current, url })
+                }
               />
             </div>
 
@@ -170,7 +182,7 @@ export function ImageDialog({
 
             <button
               type="submit"
-              disabled={busy || previewUrl === null}
+              disabled={busy || uploading || previewUrl === null}
               className="rounded-full bg-[#1f1a17] px-6 py-3 text-sm font-medium text-white transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {busy ? "Saving..." : "Save image"}

@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+} from "react";
 import {
   ALLOWED_IMAGE_HOSTS,
   IMAGE_SOURCE_HINT,
@@ -30,7 +37,8 @@ type Props = {
   draft: OfferDraft | null;
   busy: boolean;
   error: string | null;
-  onChange: (draft: OfferDraft) => void;
+  /** The parent's state setter, so async updates can apply to the latest draft. */
+  onChange: Dispatch<SetStateAction<OfferDraft | null>>;
   onSubmit: (draft: OfferDraft) => void;
   onCancel: () => void;
 };
@@ -44,6 +52,7 @@ export function OfferDialog({
   onCancel,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -55,7 +64,7 @@ export function OfferDialog({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (draft) onSubmit(draft);
+    if (draft && !uploading) onSubmit(draft);
   }
 
   // Mirrors the server rules so problems surface before a round trip.
@@ -75,7 +84,8 @@ export function OfferDialog({
     ? datesAreOrdered(draft.startDate || null, draft.endDate || null)
     : true;
   const titleOk = draft ? draft.title.trim().length > 0 : false;
-  const canSubmit = !busy && titleOk && imageProblem === null && datesOk;
+  const canSubmit =
+    !busy && !uploading && titleOk && imageProblem === null && datesOk;
 
   return (
     <dialog
@@ -223,7 +233,10 @@ export function OfferDialog({
               <ImageUpload
                 label="offer"
                 disabled={busy}
-                onUploaded={(imageUrl) => onChange({ ...draft, imageUrl })}
+                onBusyChange={setUploading}
+                onUploaded={(imageUrl) =>
+                  onChange((current) => current && { ...current, imageUrl })
+                }
               />
             </div>
 

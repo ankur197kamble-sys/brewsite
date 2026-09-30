@@ -31,6 +31,7 @@ export default function CafeInformation() {
   const [hoursText, setHoursText] = useState(cafe.hours.join("\n"));
 
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<{
     kind: "error" | "success";
     message: string;
@@ -209,7 +210,11 @@ export default function CafeInformation() {
           <ImageUpload
             label="hero image"
             disabled={saving}
-            onUploaded={setHeroImage}
+            onBusyChange={setUploading}
+            onUploaded={(url) => {
+              setHeroImage(url);
+              setStatus(null);
+            }}
           />
         </div>
 
@@ -320,10 +325,14 @@ export default function CafeInformation() {
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || uploading}
           className="rounded-full bg-[#1f1a17] px-6 py-3 text-sm font-medium text-white transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving ? "Saving..." : "Save Changes"}
+          {saving
+            ? "Saving..."
+            : uploading
+              ? "Waiting for photo..."
+              : "Save Changes"}
         </button>
       </div>
     </div>

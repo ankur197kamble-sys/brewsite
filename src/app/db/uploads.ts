@@ -28,6 +28,13 @@ export async function recordUpload(
   return row;
 }
 
+/** Removes a reservation whose upload was refused or failed to store. */
+export async function deleteUpload(cafeId: number, id: number): Promise<void> {
+  await db
+    .delete(uploads)
+    .where(and(eq(uploads.cafeId, cafeId), eq(uploads.id, id)));
+}
+
 export async function countUploadsSince(
   cafeId: number,
   since: Date,

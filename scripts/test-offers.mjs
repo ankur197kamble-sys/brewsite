@@ -112,6 +112,8 @@ async function main() {
   let result = await call("PATCH", `/api/offers/${liveId}`, { cookie: a.cookie, body: { description: "Edited" } });
   check("edits description → 200", result.status === 200 && result.json?.data?.description === "Edited");
   check("partial edit keeps other fields", result.json?.data?.value === "20% off" && result.json?.data?.title === specs.live.title);
+  result = await call("PATCH", `/api/offers/${liveId}`, { cookie: a.cookie, body: { imageUrl: "http://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800" } });
+  check("http image link is upgraded to https", result.status === 200 && result.json?.data?.imageUrl === "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800", result.json?.data?.imageUrl);
   result = await call("PATCH", `/api/offers/${liveId}`, { cookie: a.cookie, body: { value: "" } });
   check("clearing optional value stores null", result.status === 200 && result.json?.data?.value === null);
   expectStatus(
@@ -137,6 +139,7 @@ async function main() {
   section("Ordering (café A)");
   const ids = listA.map((o) => o.id);
   expectStatus("first offer cannot move up → 400", await call("PATCH", `/api/offers/${ids[0]}`, { cookie: a.cookie, body: { move: "up" } }), 400);
+  expectStatus("moving an unknown offer → 404", await call("PATCH", "/api/offers/2147483000", { cookie: a.cookie, body: { move: "up" } }), 404);
   expectStatus("last offer cannot move down → 400", await call("PATCH", `/api/offers/${ids.at(-1)}`, { cookie: a.cookie, body: { move: "down" } }), 400);
   expectStatus("move first offer down → 200", await call("PATCH", `/api/offers/${ids[0]}`, { cookie: a.cookie, body: { move: "down" } }), 200);
   listA = await listOffers(a.cookie);
@@ -158,7 +161,10 @@ async function main() {
   check("café B sees only its own offer", listB.length === 1 && listB[0].id === bOffer?.id);
   expectStatus("B cannot edit A's offer → 404", await call("PATCH", `/api/offers/${liveId}`, { cookie: b.cookie, body: { title: "hijacked" } }), 404);
   expectStatus("B cannot unpublish A's offer → 404", await call("PATCH", `/api/offers/${liveId}`, { cookie: b.cookie, body: { isPublished: false } }), 404);
-  expectStatus("B cannot move A's offer → 400", await call("PATCH", `/api/offers/${liveId}`, { cookie: b.cookie, body: { move: "down" } }), 400);
+  // Both directions: one of them would be a legal move inside café A's list,
+  // so only tenant scoping can make these fail.
+  expectStatus("B cannot move A's offer up → 404", await call("PATCH", `/api/offers/${liveId}`, { cookie: b.cookie, body: { move: "up" } }), 404);
+  expectStatus("B cannot move A's offer down → 404", await call("PATCH", `/api/offers/${liveId}`, { cookie: b.cookie, body: { move: "down" } }), 404);
   expectStatus("B cannot delete A's offer → 404", await call("DELETE", `/api/offers/${liveId}`, { cookie: b.cookie }), 404);
   expectStatus("B cannot reorder with A's ids → 404", await call("PATCH", "/api/offers/reorder", { cookie: b.cookie, body: { ids: [bOffer.id, liveId] } }), 404);
   expectStatus(

@@ -24,7 +24,8 @@ export async function PATCH(request: Request, context: Context) {
     const move = parseMoveDirection(body);
     if (move) {
       const moved = await moveOffer(cafeId, offerId, move);
-      if (!moved) return apiError("Offer cannot move further", 400);
+      if (moved === "not_found") return apiError("Offer not found", 404);
+      if (moved === "edge") return apiError("Offer cannot move further", 400);
       return apiSuccess({ moved: true });
     }
 

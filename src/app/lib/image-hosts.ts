@@ -39,21 +39,39 @@ function parseBaseUrl(value: string | undefined): string | null {
 
 export const uploadsEnabled = UPLOADS_BASE_URL !== null;
 
-type ImageSource = { hostname: string; pathPrefix?: string };
+/**
+ * Earlier public hosts of the same bucket, comma-separated, e.g. the r2.dev
+ * address used before a custom domain was connected. Photos saved under an
+ * old host keep rendering as long as that host still serves the bucket.
+ */
+const LEGACY_UPLOAD_HOSTS = (process.env.NEXT_PUBLIC_UPLOADS_LEGACY_HOSTS ?? "")
+  .split(",")
+  .map((value) => parseBaseUrl(value.trim()))
+  .filter((origin): origin is string => origin !== null)
+  .map((origin) => new URL(origin).hostname);
+
+/**
+ * `pathPrefix` and `noQuery` mirror the `pathname` and `search` rules that
+ * next.config.ts gives `remotePatterns`, so a URL passes validation exactly
+ * when the renderer will display it.
+ */
+type ImageSource = { hostname: string; pathPrefix?: string; noQuery?: boolean };
 
 /**
  * Pasted-link hosts plus, when configured, the upload bucket restricted to
- * the `/cafes/` prefix, so the bucket's other paths are never proxied.
+ * the `/cafes/` prefix with no query string, so the bucket's other paths are
+ * never proxied.
  */
 export const IMAGE_SOURCES: readonly ImageSource[] = [
   ...ALLOWED_IMAGE_HOSTS.map((hostname) => ({ hostname })),
   ...(UPLOADS_BASE_URL
-    ? [
-        {
-          hostname: new URL(UPLOADS_BASE_URL).hostname,
+    ? [new URL(UPLOADS_BASE_URL).hostname, ...LEGACY_UPLOAD_HOSTS].map(
+        (hostname) => ({
+          hostname,
           pathPrefix: UPLOADS_PATH_PREFIX,
-        },
-      ]
+          noQuery: true,
+        }),
+      )
     : []),
 ];
 
@@ -66,7 +84,8 @@ function isAllowedImageUrl(url: URL): boolean {
   return IMAGE_SOURCES.some(
     (source) =>
       source.hostname === url.hostname &&
-      (!source.pathPrefix || url.pathname.startsWith(source.pathPrefix)),
+      (!source.pathPrefix || url.pathname.startsWith(source.pathPrefix)) &&
+      (!source.noQuery || url.search === ""),
   );
 }
 
@@ -74,8 +93,10 @@ export type ImageUrlResult =
   { ok: true; value: string | null } | { ok: false; error: string };
 
 /**
- * Validates an optional image URL: http(s) only, and only from a source the
- * renderer can actually display. Empty input resolves to null.
+ * Validates an optional image URL: only from a source the renderer can
+ * actually display. The renderer fetches over https only, so an http link is
+ * upgraded rather than saved in a form that would never load. Empty input
+ * resolves to null.
  */
 export function parseImageUrl(value: unknown, label: string): ImageUrlResult {
   if (value === null || value === undefined) return { ok: true, value: null };
@@ -96,8 +117,9 @@ export function parseImageUrl(value: unknown, label: string): ImageUrlResult {
     return { ok: false, error: `${label} must be a valid URL` };
   }
 
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    return { ok: false, error: `${label} must be an http(s) URL` };
+  if (url.protocol === "http:") url.protocol = "https:";
+  if (url.protocol !== "https:") {
+    return { ok: false, error: `${label} must be an https URL` };
   }
 
   if (!isAllowedImageUrl(url)) {

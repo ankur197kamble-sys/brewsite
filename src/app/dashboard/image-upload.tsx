@@ -1,12 +1,14 @@
 "use client";
 
-import { useId, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import { uploadsEnabled } from "@/app/lib/image-hosts";
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_DIMENSION } from "@/app/lib/uploads";
 
 type Props = {
   /** Receives the public URL of the stored photo. */
   onUploaded: (url: string) => void;
+  /** Lets the form block saving while a photo is still on its way. */
+  onBusyChange?: (busy: boolean) => void;
   disabled?: boolean;
   /** Names the field this photo is for, e.g. "hero image". */
   label: string;
@@ -40,7 +42,10 @@ async function preparePhoto(file: File): Promise<Blob> {
   canvas.height = Math.round(bitmap.height * scale);
 
   const context = canvas.getContext("2d");
-  if (!context) throw new Error("Your browser could not prepare this photo.");
+  if (!context) {
+    bitmap.close();
+    throw new Error("Your browser could not prepare this photo.");
+  }
   context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
 
@@ -52,8 +57,19 @@ async function preparePhoto(file: File): Promise<Blob> {
   // A browser that cannot encode WebP silently returns PNG, which is far too
   // large for photos — fall back to JPEG instead.
   let blob = await encode("image/webp", 0.85);
-  if (!blob || blob.type !== "image/webp") blob = await encode("image/jpeg", 0.85);
-  if (blob && blob.size > MAX_UPLOAD_BYTES) blob = await encode("image/jpeg", 0.7);
+  if (!blob || blob.type !== "image/webp") {
+    // JPEG has no transparency: without a backdrop, transparent pixels
+    // (a PNG logo, say) would turn black. Paint white behind the image.
+    context.globalCompositeOperation = "destination-over";
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.globalCompositeOperation = "source-over";
+
+    blob = await encode("image/jpeg", 0.85);
+    if (blob && blob.size > MAX_UPLOAD_BYTES) {
+      blob = await encode("image/jpeg", 0.7);
+    }
+  }
 
   if (!blob) throw new Error("Your browser could not prepare this photo.");
   if (blob.size > MAX_UPLOAD_BYTES) {
@@ -72,12 +88,36 @@ function errorMessage(payload: unknown): string | null {
  * "Upload photo" control that sits beside an image URL field. Renders nothing
  * when uploads are not configured, leaving the paste-a-link field on its own.
  */
-export function ImageUpload({ onUploaded, disabled = false, label }: Props) {
-  const inputId = useId();
+export function ImageUpload({
+  onUploaded,
+  onBusyChange,
+  disabled = false,
+  label,
+}: Props) {
   const statusId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  // Keep the latest callbacks without restarting an upload in flight.
+  const onUploadedRef = useRef(onUploaded);
+  const onBusyChangeRef = useRef(onBusyChange);
+  useEffect(() => {
+    onUploadedRef.current = onUploaded;
+    onBusyChangeRef.current = onBusyChange;
+  });
+
+  // Closing the dialog (unmounting) abandons the upload, so a late result can
+  // never land in a form that has since closed or moved on to another item.
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+      onBusyChangeRef.current?.(false);
+    },
+    [],
+  );
 
   if (!uploadsEnabled) return null;
 
@@ -89,18 +129,30 @@ export function ImageUpload({ onUploaded, disabled = false, label }: Props) {
     event.target.value = "";
     if (!file) return;
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const { signal } = controller;
+
     setError(null);
+    setDone(false);
+    onBusyChangeRef.current?.(true);
 
     try {
       setStage("preparing");
       const photo = await preparePhoto(file);
+      if (signal.aborted) return;
 
       setStage("uploading");
       const body = new FormData();
       body.append("file", photo, "photo");
 
-      const response = await fetch("/api/uploads", { method: "POST", body });
+      const response = await fetch("/api/uploads", {
+        method: "POST",
+        body,
+        signal,
+      });
       const payload: unknown = await response.json().catch(() => null);
+      if (signal.aborted) return;
 
       if (!response.ok) {
         setError(errorMessage(payload) ?? "Upload failed. Please try again.");
@@ -113,36 +165,42 @@ export function ImageUpload({ onUploaded, disabled = false, label }: Props) {
         return;
       }
 
-      onUploaded(url);
+      onUploadedRef.current(url);
+      setDone(true);
     } catch (caught) {
+      if (signal.aborted) return;
       setError(
         caught instanceof Error && caught.message
           ? caught.message
           : "Network error. Please try again.",
       );
     } finally {
-      setStage("idle");
+      if (!signal.aborted) {
+        setStage("idle");
+        onBusyChangeRef.current?.(false);
+      }
     }
   }
 
   return (
     <div className="mt-3">
+      {/* Opened only through the button below, so hidden from assistive
+          technology and the tab order to avoid a duplicate, unlabelled control. */}
       <input
         ref={inputRef}
-        id={inputId}
         type="file"
         accept="image/jpeg,image/png,image/webp,image/*"
         onChange={handleChange}
         disabled={disabled || busy}
         className="sr-only"
-        aria-describedby={statusId}
         tabIndex={-1}
+        aria-hidden="true"
       />
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={disabled || busy}
-        aria-label={`Upload a photo for the ${label}`}
+        aria-describedby={statusId}
         className="rounded-full border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {stage === "preparing"
@@ -150,6 +208,7 @@ export function ImageUpload({ onUploaded, disabled = false, label }: Props) {
           : stage === "uploading"
             ? "Uploading..."
             : "Upload photo"}
+        <span className="sr-only"> for the {label}</span>
       </button>
 
       <p
@@ -157,7 +216,12 @@ export function ImageUpload({ onUploaded, disabled = false, label }: Props) {
         role={error ? "alert" : "status"}
         className={error ? "mt-2 text-xs text-red-900" : "sr-only"}
       >
-        {error ?? (busy ? "Uploading photo" : "")}
+        {error ??
+          (busy
+            ? "Uploading photo"
+            : done
+              ? `Photo uploaded for the ${label}.`
+              : "")}
       </p>
     </div>
   );

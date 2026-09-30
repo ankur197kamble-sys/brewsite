@@ -14,6 +14,13 @@ export function invalid<T>(error: string): Validated<T> {
 
 export type MoveDirection = "up" | "down";
 
+/**
+ * Outcome of a one-step move. "not_found" covers ids that belong to another
+ * café, so a cross-tenant move answers 404 exactly like every other
+ * cross-tenant request; "edge" means the row is already first or last.
+ */
+export type MoveResult = "moved" | "edge" | "not_found";
+
 /** Accepts a route param string or a JSON number; rejects anything else. */
 export function parseId(value: unknown): number | null {
   const id = typeof value === "string" ? Number(value) : value;

@@ -96,6 +96,25 @@ async function main() {
   wayOver.set(JPEG_HEADER);
   expectStatus("body far over the limit → 413", await upload(a.cookie, wayOver, { type: "image/jpeg" }), 413);
 
+  // A streamed (chunked) body carries no Content-Length, so the size must be
+  // enforced while reading. 6 MB in 64 KB chunks, never declaring a length.
+  const chunk = new Uint8Array(64 * 1024);
+  let sent = 0;
+  const endless = new ReadableStream({
+    pull(controller) {
+      if (sent >= 6 * 1024 * 1024) return controller.close();
+      sent += chunk.byteLength;
+      controller.enqueue(chunk);
+    },
+  });
+  const chunked = await fetch(`${BASE_URL}/api/uploads`, {
+    method: "POST",
+    headers: { Cookie: a.cookie, "Content-Type": "multipart/form-data; boundary=x" },
+    body: endless,
+    duplex: "half",
+  }).catch((error) => ({ status: `network error: ${error.message}` }));
+  expectStatus("chunked body over the limit, no Content-Length → 413", { status: chunked.status }, 413);
+
   if (!configured) {
     section("Storage not configured");
     const result = await upload(a.cookie, PNG, { type: "text/plain", name: "notes.txt" });
@@ -109,7 +128,9 @@ async function main() {
     const base = new URL(process.env.NEXT_PUBLIC_UPLOADS_BASE_URL).origin;
     check("URL is under this café's folder", url.startsWith(`${base}/cafes/${a.cafeId}/`), url);
     check("stored as .png from the sniffed type", url.endsWith(".png"));
-    check("client file name never reaches the key", !url.includes("evil") && !url.includes("999"));
+    const keyPattern = new RegExp(`^/cafes/${a.cafeId}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.png$`);
+    const keyPath = new URL(url).pathname;
+    check("key is cafes/<café>/<uuid>.png — nothing from the client", keyPattern.test(keyPath), keyPath);
 
     const [row] = await db.select().from(uploads).where(eq(uploads.url, url));
     check("upload is recorded for café A", row?.cafeId === a.cafeId && row?.sizeBytes === PNG.length && row?.contentType === "image/png");
@@ -133,6 +154,13 @@ async function main() {
       body: JSON.stringify({ url: `${base}/private/secret.png` }),
     });
     expectStatus("bucket URL outside /cafes/ is rejected → 400", { status: outsidePrefix.status }, 400);
+
+    const withQuery = await fetch(`${BASE_URL}/api/gallery`, {
+      method: "POST",
+      headers: { Cookie: a.cookie, "Content-Type": "application/json" },
+      body: JSON.stringify({ url: `${url}?v=1` }),
+    });
+    expectStatus("bucket URL with a query string is rejected → 400", { status: withQuery.status }, 400);
 
     const optimised = await fetch(`${BASE_URL}/_next/image?url=${encodeURIComponent(url)}&w=640&q=75`);
     check("next/image serves the uploaded photo → 200", optimised.status === 200, `got ${optimised.status}`);

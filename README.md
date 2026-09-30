@@ -27,11 +27,20 @@ Drizzle ORM.
    ```bash
    npm run db:push
    ```
-4. Create a dashboard login for a café:
+4. Create the first café. The public homepage always shows café **#1**
+   (see `src/app/lib/tenant.ts`), and the offers test suite checks it, so it
+   must exist before `npm test`. On a fresh database, run this in the Neon
+   SQL editor (or add a row with `npm run db:studio`) and check it returns 1:
+   ```sql
+   INSERT INTO cafes (name) VALUES ('Your Café') RETURNING id;
+   ```
+   Everything else (story, hours, photos) can then be filled in from the
+   dashboard.
+5. Create a dashboard login for that café:
    ```bash
    npm run create-user -- owner@example.com "a-long-password" 1
    ```
-5. Start the app at http://localhost:3000:
+6. Start the app at http://localhost:3000:
    ```bash
    npm run dev
    ```
@@ -61,6 +70,8 @@ the app still works, and owners can only paste image links.
    R2_BUCKET=brewsite-photos
    NEXT_PUBLIC_UPLOADS_BASE_URL=https://pub-....r2.dev
    ```
+   Use just the origin (`https://host`), with no path: photos are stored at
+   `<origin>/cafes/<café id>/…`.
 5. Restart `npm run dev`, then run `npm run test:uploads`. With credentials
    present it stores a real photo, reads it back and deletes it.
 
@@ -68,8 +79,19 @@ When deploying, add the same five variables to the hosting provider.
 `NEXT_PUBLIC_UPLOADS_BASE_URL` is compiled into the app, so rebuild after
 changing it.
 
+**Moving to a custom domain later:** photos already saved keep their old
+address (for example the `r2.dev` one). Keep that public access switched on
+and list the old origin so those photos stay valid:
+```
+NEXT_PUBLIC_UPLOADS_BASE_URL=https://photos.yourdomain.com
+NEXT_PUBLIC_UPLOADS_LEGACY_HOSTS=https://pub-....r2.dev
+```
+(Several old origins can be listed, separated by commas.)
+
 Limits: 4 MB per photo after resizing, JPEG/PNG/WebP only (checked from the
-file's bytes, not its name), and 100 uploads per café per day.
+file's bytes, not its name), and 100 uploads per café per day. Image links
+must be https (http links are upgraded automatically); links to the photo
+bucket must point inside `/cafes/` and carry no `?query`.
 
 ## Tests and checks
 
@@ -99,7 +121,7 @@ npx next build
 ```
 src/app/page.tsx          public homepage
 src/app/dashboard/        café dashboard
-src/app/api/              API routes (auth, cafe, menu, gallery, offers)
+src/app/api/              API routes (auth, cafe, menu, gallery, offers, uploads)
 src/app/db/               schema and tenant-scoped data access
 src/app/lib/              validation, auth, sessions, image-host allowlist
 scripts/                  admin scripts and test suites

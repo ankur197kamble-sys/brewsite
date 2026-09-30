@@ -111,6 +111,48 @@ export function onCleanup(step) {
   cleanupSteps.push(step);
 }
 
+/**
+ * Runs every registered cleanup step, each isolated so one failure cannot
+ * skip the rest, and always deletes the test cafés last (which cascades to
+ * their users, sessions, menu, gallery, offers and upload rows). Safe to call
+ * twice; only the first call does anything.
+ */
+let cleanedUp = false;
+async function cleanup() {
+  if (cleanedUp) return true;
+  cleanedUp = true;
+
+  let ok = true;
+  for (const step of cleanupSteps) {
+    try {
+      await step();
+    } catch (error) {
+      ok = false;
+      console.error("\n✗ A cleanup step failed:", error);
+    }
+  }
+
+  try {
+    if (createdCafeIds.length > 0) {
+      await db.delete(cafes).where(inArray(cafes.id, createdCafeIds));
+    }
+  } catch (error) {
+    ok = false;
+    console.error("\n✗ Could not delete test cafés — remove '[test] …' cafés manually:", error);
+  }
+
+  if (ok) console.log("\nCleaned up everything this run created.");
+  return ok;
+}
+
+// Ctrl+C mid-run must not leave test rows behind (some suites briefly add
+// rows to the real public café).
+process.once("SIGINT", async () => {
+  console.error("\nInterrupted — cleaning up before exit...");
+  await cleanup();
+  process.exit(130);
+});
+
 /** Runs the tests, always cleans up, prints the summary and exits. */
 export async function finish(main) {
   try {
@@ -119,16 +161,7 @@ export async function finish(main) {
     failures.push(`crashed: ${error instanceof Error ? error.message : String(error)}`);
     console.error("\n✗ Test run crashed:", error);
   } finally {
-    try {
-      for (const step of cleanupSteps) await step();
-      if (createdCafeIds.length > 0) {
-        await db.delete(cafes).where(inArray(cafes.id, createdCafeIds));
-      }
-      console.log("\nCleaned up everything this run created.");
-    } catch (error) {
-      console.error("\n✗ Cleanup failed — remove '[test] …' cafés manually:", error);
-      failures.push("cleanup");
-    }
+    if (!(await cleanup())) failures.push("cleanup");
   }
 
   console.log(`\n${passed} passed, ${failures.length} failed`);

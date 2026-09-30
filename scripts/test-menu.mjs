@@ -63,6 +63,9 @@ async function main() {
   section("Items (café A)");
   let result = await call("POST", "/api/menu/items", { cookie: a.cookie, body: { ...base, price: "₹1,240.50", imageUrl: ALLOWED_IMAGE } });
   expectStatus("creates item with allowed image → 201", result, 201);
+  const httpItem = await call("POST", "/api/menu/items", { cookie: a.cookie, body: { ...base, name: tag("Http image"), imageUrl: ALLOWED_IMAGE.replace("https:", "http:") } });
+  check("http image link is upgraded to https", httpItem.status === 201 && httpItem.json?.data?.imageUrl === ALLOWED_IMAGE, httpItem.json?.data?.imageUrl);
+  if (httpItem.json?.data?.id) await call("DELETE", `/api/menu/items/${httpItem.json.data.id}`, { cookie: a.cookie });
   const latte = result.json?.data;
   check("price is normalised to 1240.50", latte?.price === "1240.50");
   check("image URL is stored", latte?.imageUrl === ALLOWED_IMAGE);
@@ -75,6 +78,7 @@ async function main() {
   result = await call("PATCH", `/api/menu/items/${latte.id}`, { cookie: a.cookie, body: { isPublished: false } });
   check("unpublish → 200", result.status === 200 && result.json?.data?.isPublished === false);
   expectStatus("move first item up → 400", await call("PATCH", `/api/menu/items/${latte.id}`, { cookie: a.cookie, body: { move: "up" } }), 400);
+  expectStatus("moving an unknown item → 404", await call("PATCH", "/api/menu/items/2147483000", { cookie: a.cookie, body: { move: "up" } }), 404);
   expectStatus("move first item down → 200", await call("PATCH", `/api/menu/items/${latte.id}`, { cookie: a.cookie, body: { move: "down" } }), 200);
   const coffeeItems = (await getMenu(a.cookie)).find((c) => c.id === coffee.id)?.items ?? [];
   check("move swapped the items", coffeeItems.map((i) => i.id).join() === [mocha.id, latte.id].join());
@@ -89,7 +93,10 @@ async function main() {
   expectStatus("B cannot add an item to A's category → 404", await call("POST", "/api/menu/items", { cookie: b.cookie, body: { categoryId: coffee.id, name: "x", price: "1" } }), 404);
   expectStatus("B cannot move its item into A's category → 404", await call("PATCH", `/api/menu/items/${bItem.id}`, { cookie: b.cookie, body: { categoryId: coffee.id } }), 404);
   expectStatus("B cannot edit A's item → 404", await call("PATCH", `/api/menu/items/${latte.id}`, { cookie: b.cookie, body: { name: "hijacked" } }), 404);
-  expectStatus("B cannot move A's item → 400", await call("PATCH", `/api/menu/items/${latte.id}`, { cookie: b.cookie, body: { move: "up" } }), 400);
+  expectStatus("B cannot move A's item up → 404", await call("PATCH", `/api/menu/items/${latte.id}`, { cookie: b.cookie, body: { move: "up" } }), 404);
+  expectStatus("B cannot move A's item down → 404", await call("PATCH", `/api/menu/items/${latte.id}`, { cookie: b.cookie, body: { move: "down" } }), 404);
+  // A has two categories, so "down" on the first would be legal for A itself.
+  expectStatus("B cannot move A's category → 404", await call("PATCH", `/api/menu/categories/${coffee.id}`, { cookie: b.cookie, body: { move: "down" } }), 404);
   expectStatus("B cannot delete A's item → 404", await call("DELETE", `/api/menu/items/${latte.id}`, { cookie: b.cookie }), 404);
   expectStatus("B cannot rename A's category → 404", await call("PATCH", `/api/menu/categories/${coffee.id}`, { cookie: b.cookie, body: { name: "hijacked" } }), 404);
   expectStatus("B cannot delete A's category → 404", await call("DELETE", `/api/menu/categories/${coffee.id}`, { cookie: b.cookie }), 404);

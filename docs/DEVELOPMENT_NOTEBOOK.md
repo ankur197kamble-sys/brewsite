@@ -281,7 +281,7 @@ image field was a URL input validated against a one-host allowlist.
 - `src/app/lib/uploads.ts`: limits and byte-signature file-type detection
 - `src/app/db/uploads.ts`: `recordUpload`, `countUploadsSince`
 - `src/app/dashboard/image-upload.tsx`: the "Upload photo" control
-- `scripts/test-uploads.mjs`: 21 checks without R2 (more with R2)
+- `scripts/test-uploads.mjs`: 22 checks without R2 (more with R2)
 
 ### 6. Files modified
 - `src/app/lib/image-hosts.ts`: `IMAGE_SOURCES` (hosts plus optional path
@@ -415,6 +415,51 @@ enables per-café storage reporting (billing) and cleanup when a café leaves.
   anyway; can be tightened by checking the `cafes/<id>/` prefix against the
   session.
 - `r2.dev` URLs are rate-limited; use a custom domain before launch.
+
+### Milestone 9, part 2: independent review and fixes
+
+Before calling the branch complete, five independent reviewers each examined
+one dimension of the unmerged diff: upload server, allowlist and config,
+client UI and accessibility, tenant and data safety, and whether the tests
+and docs are accurate. A separate skeptic then tried to refute every finding.
+Result: 23 candidates, 21 confirmed. They deduplicate to 14 distinct issues,
+all fixed. Two were refuted: menu items with old non-allowlisted images
+(none exist), and a claimed "high" risk of test offers being left on café #1
+(the cleanup runs in `finally`; Ctrl+C is now handled too).
+
+| # | Issue | Fix |
+|---|---|---|
+| 1 | Upload callback spread a stale draft: edits made during an upload were lost | Dialog `onChange` is now the parent's `setDraft`; uploads apply with `setDraft(current => …)` |
+| 2 | Save was possible mid-upload; closing a dialog mid-upload could deliver the URL to a later dialog | `ImageUpload` reports `onBusyChange`, Save waits ("Waiting for photo..."), and unmounting aborts the upload |
+| 3 | Daily limit was check-then-act, so parallel requests could exceed it | Reserve the row, then count; roll back on 429 or storage failure. It can hit the limit exactly but never exceed it |
+| 4 | A chunked body (no Content-Length) was buffered in full before the size check | The byte-counting stream stops reading past 4 MB + 64 KB and returns 413 |
+| 5 | The validator accepted bucket URLs with `?query` and `http:` links that `next/image` rejects | `IMAGE_SOURCES` carries `noQuery`, which drives both the validator and `remotePatterns`; http is upgraded to https |
+| 6 | Moving from r2.dev to a custom domain would break earlier photos | `NEXT_PUBLIC_UPLOADS_LEGACY_HOSTS` keeps old bucket hosts valid |
+| 7 | The Safari JPEG fallback turned transparent pixels black | Paint white behind the image before encoding JPEG |
+| 8 | Overview said "Demo gallery" when legacy photos were really shown | Mirrors the full fallback chain ("N older photos") |
+| 9 | Upload button: status linked to the hidden input; accessible name did not start with the visible text; success not announced | `aria-describedby` on the button, hidden input `aria-hidden`, sr-only suffix, "Photo uploaded…" status |
+| 10 | A failing cleanup step skipped test-café deletion | Each step isolated; cafés are always deleted last; Ctrl+C runs cleanup |
+| 11 | Cross-tenant "move" tests could not fail (the target was already at the edge) | Move functions return `moved`/`edge`/`not_found`; cross-tenant moves now get 404 and are tested in both directions |
+| 12 | README never created café #1 | New setup step with SQL |
+| 13 | Upload key test could fail by chance (`includes("999")`) | Exact `^/cafes/<id>/<uuid>.png$` match |
+| 14 | README layout omitted the uploads route | Updated |
+
+**API change:** moving a gallery image, offer, menu item or category that
+does not exist, or belongs to another café, now returns **404** instead of
+400. 400 now means only "already first/last". The dashboard shows the
+message either way.
+
+**Verification:**
+- Suites: menu 46, offers 82, uploads 22 (new: chunked-body 413, http
+  upgrade, query rejection, cross-tenant move 404s).
+- With a placeholder bucket plus a legacy host: 13 allowlist and
+  `next/image` agreement checks.
+- In the browser: alt text typed during an upload survives; Save stays
+  disabled until the photo arrives; closing mid-upload leaves the next dialog
+  clean; success is announced; the forced Safari JPEG path produces white,
+  not black.
+- `tsc`, `eslint`, and `next build` with uploads off and on.
+- Database verified unchanged afterwards.
 
 ### 24. Next task
 1. Owner: create the R2 bucket and token (README), add the `.env.local`
