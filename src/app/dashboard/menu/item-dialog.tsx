@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useRef, type FormEvent } from "react";
-import { ALLOWED_IMAGE_HOSTS, parseImageUrl } from "@/app/lib/image-hosts";
+import {
+  ALLOWED_IMAGE_HOSTS,
+  IMAGE_SOURCE_HINT,
+  parseImageUrl,
+} from "@/app/lib/image-hosts";
+import { ImageUpload } from "../image-upload";
 import { parsePrice, type MenuCategoryView } from "@/app/lib/menu";
 
 export type ItemDraft = {
@@ -188,9 +193,13 @@ export function ItemDialog({
                     : "mt-2 text-xs text-black/45"
                 }
               >
-                {imageProblem ??
-                  `Hosted on ${ALLOWED_IMAGE_HOSTS.join(" or ")}.`}
+                {imageProblem ?? IMAGE_SOURCE_HINT}
               </p>
+              <ImageUpload
+                label="menu item"
+                disabled={busy}
+                onUploaded={(imageUrl) => onChange({ ...draft, imageUrl })}
+              />
             </div>
 
             <label className="flex items-center gap-3 text-sm">

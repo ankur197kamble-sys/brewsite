@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, type FormEvent } from "react";
 import { ImagePreview } from "../image-preview";
-import { ALLOWED_IMAGE_HOSTS, parseImageUrl } from "@/app/lib/image-hosts";
+import {
+  ALLOWED_IMAGE_HOSTS,
+  IMAGE_SOURCE_HINT,
+  parseImageUrl,
+} from "@/app/lib/image-hosts";
+import { ImageUpload } from "../image-upload";
 
 export type ImageDraft = {
   id: number | null;
@@ -98,8 +103,13 @@ export function ImageDialog({
                 className={fieldClass}
               />
               <p id="image-url-hint" className="mt-2 text-xs text-black/45">
-                {urlProblem ?? `Hosted on ${ALLOWED_IMAGE_HOSTS.join(" or ")}.`}
+                {urlProblem ?? IMAGE_SOURCE_HINT}
               </p>
+              <ImageUpload
+                label="gallery image"
+                disabled={busy}
+                onUploaded={(url) => onChange({ ...draft, url })}
+              />
             </div>
 
             <div>

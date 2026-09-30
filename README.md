@@ -36,14 +36,50 @@ Drizzle ORM.
    npm run dev
    ```
 
+## Photo uploads (Cloudflare R2)
+
+Owners can upload their own photos for the hero image, gallery, offers and
+menu items. Photos are resized in the browser (max 2400 px, WebP/JPEG, EXIF
+and GPS data stripped) and stored in Cloudflare R2. Without the settings below
+the app still works, and owners can only paste image links.
+
+1. In the Cloudflare dashboard, open **R2 Object Storage** and create a bucket
+   (for example `brewsite-photos`). Cloudflare may ask for a payment method
+   to enable R2, even within the free tier.
+2. In the bucket's **Settings → Public access**, either enable the
+   **R2.dev subdomain** (fine for testing; rate-limited) or connect a custom
+   domain (recommended for production, for example `photos.yourdomain.com`).
+   Copy the public URL.
+3. Under **R2 → Manage API tokens**, create a token with **Object Read &
+   Write** permission for that bucket only. Copy the Access Key ID and the
+   Secret Access Key (shown once) and your Account ID.
+4. Add these to `.env.local`. Keep the secret out of chat, git and screenshots.
+   ```
+   R2_ACCOUNT_ID=...
+   R2_ACCESS_KEY_ID=...
+   R2_SECRET_ACCESS_KEY=...
+   R2_BUCKET=brewsite-photos
+   NEXT_PUBLIC_UPLOADS_BASE_URL=https://pub-....r2.dev
+   ```
+5. Restart `npm run dev`, then run `npm run test:uploads`. With credentials
+   present it stores a real photo, reads it back and deletes it.
+
+When deploying, add the same five variables to the hosting provider.
+`NEXT_PUBLIC_UPLOADS_BASE_URL` is compiled into the app, so rebuild after
+changing it.
+
+Limits: 4 MB per photo after resizing, JPEG/PNG/WebP only (checked from the
+file's bytes, not its name), and 100 uploads per café per day.
+
 ## Tests and checks
 
 With `npm run dev` running in another terminal:
 
 ```bash
-npm test               # menu + offers end-to-end suites
+npm test               # menu, offers and uploads end-to-end suites
 npm run test:menu
 npm run test:offers
+npm run test:uploads
 ```
 
 The suites call the real HTTP API as two throwaway `[test]` cafés, including

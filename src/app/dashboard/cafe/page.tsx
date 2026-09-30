@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { cafe } from "../../data/cafe";
 import { normalizeStringList } from "../../lib/site-cafe";
-import { ALLOWED_IMAGE_HOSTS } from "../../lib/image-hosts";
+import { ALLOWED_IMAGE_HOSTS, IMAGE_SOURCE_HINT } from "../../lib/image-hosts";
+import { ImageUpload } from "../image-upload";
 
 const inputClass =
   "mt-3 w-full rounded-xl border border-black/10 bg-white px-4 py-3 outline-none focus:border-black/30";
@@ -202,9 +203,14 @@ export default function CafeInformation() {
             className={inputClass}
           />
           <p className="mt-2 text-xs text-black/45">
-            Images must be hosted on {ALLOWED_IMAGE_HOSTS.join(" or ")}. Leave
-            blank to use the default photo.
+            {IMAGE_SOURCE_HINT} Leave blank to use the default photo. Remember
+            to save your changes.
           </p>
+          <ImageUpload
+            label="hero image"
+            disabled={saving}
+            onUploaded={setHeroImage}
+          />
         </div>
 
         <div className="rounded-2xl border border-black/10 bg-white/50 p-6">

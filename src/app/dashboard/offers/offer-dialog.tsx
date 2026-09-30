@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useRef, type FormEvent } from "react";
-import { ALLOWED_IMAGE_HOSTS, parseImageUrl } from "@/app/lib/image-hosts";
+import {
+  ALLOWED_IMAGE_HOSTS,
+  IMAGE_SOURCE_HINT,
+  parseImageUrl,
+} from "@/app/lib/image-hosts";
+import { ImageUpload } from "../image-upload";
 import { datesAreOrdered } from "@/app/lib/offers";
 import { ImagePreview } from "../image-preview";
 
@@ -213,9 +218,13 @@ export function OfferDialog({
                   imageProblem ? "mt-2 text-xs text-red-900" : hintClass
                 }
               >
-                {imageProblem ??
-                  `Optional. Hosted on ${ALLOWED_IMAGE_HOSTS.join(" or ")}.`}
+                {imageProblem ?? `Optional. ${IMAGE_SOURCE_HINT}`}
               </p>
+              <ImageUpload
+                label="offer"
+                disabled={busy}
+                onUploaded={(imageUrl) => onChange({ ...draft, imageUrl })}
+              />
             </div>
 
             <div>

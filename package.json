@@ -13,10 +13,12 @@
     "backfill-gallery": "node --env-file=.env.local scripts/backfill-gallery.mjs",
     "test:offers": "node --env-file=.env.local scripts/test-offers.mjs",
     "test:menu": "node --env-file=.env.local scripts/test-menu.mjs",
-    "test": "npm run test:menu && npm run test:offers"
+    "test": "npm run test:menu && npm run test:offers && npm run test:uploads",
+    "test:uploads": "node --env-file=.env.local scripts/test-uploads.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "aws4fetch": "^1.0.20",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "next": "16.3.4",

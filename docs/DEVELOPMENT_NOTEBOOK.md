@@ -24,6 +24,7 @@ from the git history and the project handoff, not written up in full.
 | 7 | 2026-09-28 | `e81e722` | Gallery and offers in dedicated tables with dashboards |
 | — | 2026-09-30 | `61ee612` | PR #1 merged: all of the above reaches `main` on GitHub |
 | 8 | 2026-09-30 | branch `offers-verification` | Offers verification, repeatable tests, four fixes (below) |
+| 9 | 2026-09-30 | branch `photo-uploads` | Photo uploads to Cloudflare R2 |
 
 ---
 
@@ -240,3 +241,183 @@ src/
 2. Add `scripts/test-gallery.mjs` using the harness (the gallery has no
    automated tests yet).
 3. Then the next product feature (reviews, SEO or QR menu).
+
+---
+
+## Milestone 9: Photo uploads (Cloudflare R2)
+
+### 1. Objective
+Let café owners upload their own photos for the hero image, gallery, offers
+and menu items, instead of being limited to Unsplash links.
+
+### 2. Why
+A real café needs its own photography, and the project rules require real or
+licensed photos for a live café. Until now the only allowed image source was
+`images.unsplash.com`, which blocked the first real customer. R2 was chosen
+over Vercel Blob because it charges nothing for image traffic (egress), which
+keeps per-café cost predictable against the ₹5,000/month target.
+
+### 3. Starting state
+Branch `photo-uploads` from `offers-verification` (not yet merged). Every
+image field was a URL input validated against a one-host allowlist.
+
+### 4. Steps
+1. Read the Next 16 docs for Route Handler `formData()` and
+   `images.remotePatterns` (`pathname`, `search`).
+2. Installed `aws4fetch` (MIT, no dependencies), Cloudflare's recommended R2
+   signer, instead of the much larger AWS SDK.
+3. Extended the image allowlist with an optional upload bucket restricted to
+   `/cafes/`.
+4. Added the `uploads` table, `db/uploads.ts`, `lib/r2.ts`, `lib/uploads.ts`
+   and `POST /api/uploads`.
+5. Built `<ImageUpload>` and added it to all four image fields.
+6. `npm run db:push`: created the `uploads` table (additive only).
+7. Wrote `scripts/test-uploads.mjs`, ran all suites, a browser check and both
+   builds.
+
+### 5. Files created
+- `src/app/api/uploads/route.ts`: upload endpoint
+- `src/app/lib/r2.ts`: server-only R2 client (`putObject`, `deleteObject`)
+- `src/app/lib/uploads.ts`: limits and byte-signature file-type detection
+- `src/app/db/uploads.ts`: `recordUpload`, `countUploadsSince`
+- `src/app/dashboard/image-upload.tsx`: the "Upload photo" control
+- `scripts/test-uploads.mjs`: 21 checks without R2 (more with R2)
+
+### 6. Files modified
+- `src/app/lib/image-hosts.ts`: `IMAGE_SOURCES` (hosts plus optional path
+  prefix), `UPLOADS_BASE_URL`, `uploadsEnabled`, `IMAGE_SOURCE_HINT`
+- `next.config.ts`: remote patterns built from `IMAGE_SOURCES`; the bucket
+  gets `pathname: "/cafes/**"` and `search: ""`
+- `src/app/db/schema.ts`: `uploads` table
+- The four image fields: café hero, gallery, offer and menu item dialogs
+- `scripts/lib/harness.mjs`: `testCafeIds()`
+- `package.json`: `aws4fetch`, `test:uploads`, `npm test` runs all three
+- `README.md`: R2 setup guide
+
+### 7. Important code and concepts
+- **Upload flow:** the browser decodes the photo, resizes it to at most
+  2400 px, and re-encodes it as WebP (or JPEG where WebP encoding is
+  unsupported, e.g. Safari). It then POSTs multipart data to `/api/uploads`.
+  The server checks auth → daily limit → size → real file type → storage
+  configured, stores the object as `cafes/<sessionCafeId>/<uuid>.<ext>`,
+  records it, and returns the public URL. That URL goes into the existing
+  image field, so no other API changed.
+- **File-type sniffing:** the first bytes decide the type (JPEG `FF D8 FF`,
+  PNG signature, `RIFF….WEBP`). The client's file name and MIME type are
+  ignored, so SVG with script, HTML or GIF are refused with 415.
+- **Keys come only from the server:** the café id comes from the session and
+  the name is a random UUID, so a café cannot write into another café's
+  folder or overwrite an existing photo.
+
+### 8. Commands
+```bash
+npm install aws4fetch
+npm run db:push
+npm run test:uploads
+```
+
+### 9. Database changes
+New table `uploads` (id, cafe_id → cafes ON DELETE CASCADE, key unique, url,
+content_type, size_bytes, created_at), with an index on
+`(cafe_id, created_at)` for the daily-limit count. No existing tables changed;
+row counts were verified unchanged.
+
+### 10. Frontend changes
+Every image field has an **Upload photo** button with "Preparing photo…" and
+"Uploading…" states, errors announced via `role="alert"`, a field-specific
+`aria-label`, and a new hint text. Nothing is shown when uploads are not
+configured.
+
+### 11. Backend and API changes
+`POST /api/uploads` → 201 `{ id, url }`; 400 no/empty file or not multipart;
+401 not signed in; 413 over 4 MB; 415 not JPEG/PNG/WebP; 429 over 100 per
+day; 502 storage error; 503 not configured.
+
+### 12. Architecture decisions
+- **Server-proxied upload instead of presigned direct-to-R2.** This needs no
+  bucket CORS setup, lets the server inspect every byte, and stays under
+  Vercel's ~4.5 MB body limit because the browser shrinks photos first.
+- **URLs stay the stored value.** Existing columns did not change; the
+  uploads table only records ownership.
+- **No automatic deletion of replaced photos yet** (see Known limitations).
+
+### 13. Security considerations
+- R2 secrets are server-only (`lib/r2.ts`); only the public base URL is
+  exposed to the browser.
+- `next/image` proxies only `/cafes/**` on the bucket, with no query string.
+  Verified: `/private/…`, `?v=1` and other hosts return 400.
+- SVG is refused (stored XSS risk); types are sniffed, not trusted.
+- Photos are re-encoded in the browser, which strips EXIF/GPS. The server
+  does not strip EXIF itself (a request made outside the dashboard could keep
+  it); acceptable because only the café's own signed-in owner can upload.
+- Per-café daily limit caps storage abuse.
+
+### 14. Performance considerations
+Photos typically go from several MB to a few hundred KB before upload (test:
+3000×2000 JPEG, 692 KB → 2400×1600 WebP, 139 KB). Objects are served with
+`Cache-Control: public, max-age=31536000, immutable` because keys never
+change.
+
+### 15. Problems and errors
+| Problem | Fix |
+|---|---|
+| Test cleanup could not tell which cafés were test cafés | Harness now exposes `testCafeIds()` |
+| Browser pane hidden, keyboard input would not reach it | Signed in via the login API from inside the page, then drove the dialog with DOM events |
+
+### 16. Fixes
+See the table above.
+
+### 17. Tests
+- `npm run test:uploads`: **21 passed** (R2 not configured). Covers
+  sniffing, 401, 400s, 415 for SVG/HTML/GIF disguised as images, 413 at
+  1 byte over and far over, 503, the 429 daily limit, and that the limit is
+  per café.
+- With a placeholder bucket URL: gallery accepts `/cafes/…` on the bucket,
+  rejects other paths and hosts (6 checks), and `next/image` patterns were
+  verified as above.
+- Browser: the upload button appears in the gallery dialog and hero field; a
+  3000×2000 photo was resized and sent as WebP; the server's 503 message is
+  shown; a non-photo file shows a readable error; the button is
+  keyboard-reachable.
+- Regression: menu 42/42, offers 79/79; `tsc`, `eslint`, and `next build`
+  both with and without the bucket URL.
+- **Not yet run:** the real R2 round trip (store → public URL → gallery →
+  `next/image` → delete). It is written and runs automatically once R2
+  credentials are in `.env.local`.
+
+### 18. Expected vs actual
+Everything testable without R2 credentials behaves as designed. The R2
+signing and storage path is unverified until credentials exist.
+
+### 19. Git checkpoint
+Branch `photo-uploads`, commit "Add photo uploads to Cloudflare R2".
+
+### 20. What it enables
+Onboarding a real café with its own photography. The `uploads` table also
+enables per-café storage reporting (billing) and cleanup when a café leaves.
+
+### 21. Lessons learned
+- Keep the stored value unchanged (a URL) and add capability around it; no
+  existing API had to change.
+- Test up to the external dependency, and make the suite upgrade itself once
+  credentials appear.
+
+### 22. Terminology
+- **R2:** Cloudflare's S3-compatible object storage.
+- **Egress:** data transferred out to visitors; R2 does not charge for it.
+- **Object key:** the path of a file inside a bucket.
+- **Magic bytes / sniffing:** identifying a file type from its first bytes.
+
+### 23. Known limitations and follow-ups
+- Replaced or deleted photos stay in R2 (orphans). Storage is cheap, and the
+  `uploads` table makes a later cleanup script straightforward.
+- A café could paste another café's public photo URL. The photos are public
+  anyway; can be tightened by checking the `cafes/<id>/` prefix against the
+  session.
+- `r2.dev` URLs are rate-limited; use a custom domain before launch.
+
+### 24. Next task
+1. Owner: create the R2 bucket and token (README), add the `.env.local`
+   values, and run `npm run test:uploads` for the full round trip.
+2. Merge `offers-verification`, then `photo-uploads`.
+3. Then deployment to Vercel with a real domain.

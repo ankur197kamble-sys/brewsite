@@ -101,6 +101,11 @@ export async function createTenant(label) {
   return { cafeId: cafe.id, cookie: await login(email, password) };
 }
 
+/** Ids of the throwaway cafés created so far in this run. */
+export function testCafeIds() {
+  return [...createdCafeIds];
+}
+
 /** Registers extra cleanup, e.g. rows inserted for the public café. */
 export function onCleanup(step) {
   cleanupSteps.push(step);
