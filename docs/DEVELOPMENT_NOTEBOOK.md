@@ -576,3 +576,40 @@ issues, all fixed in commit `2e3ac0d`:
    can be uploaded once R2 is configured.
 6. The spelling of the motto, and the sandwich prices, which were small
    print.
+
+---
+
+## Milestone 11: Deploy-ready, with preview mode
+
+**Why:** the site is going online before Coffee Gruham has agreed to rent it.
+A public site using a real café's name, phone and prices could be mistaken
+for their official site, and a few prices are still unconfirmed.
+
+**Changes (branch `deploy-ready`):**
+- `SITE_PREVIEW=true` (`src/app/lib/site-mode.ts`) marks every page
+  `noindex`:
+  - a `<meta name="robots">` tag on the homepage, and
+  - an `X-Robots-Tag` header on every response, including optimised images
+    (`next.config.ts` `headers()`).
+
+  The site works normally for anyone given the link.
+- `src/app/robots.ts` always keeps crawlers out of `/dashboard`, `/login` and
+  `/api/`. Public pages stay crawlable, because crawlers must be able to read
+  a `noindex` to honour it.
+- `vercel.json` pins functions to `sin1` (Singapore), the Neon region.
+  Otherwise every query would cross to Vercel's default US region.
+- README: step-by-step Vercel deployment, the redeploy-after-env-change rule,
+  and the Hobby-plan non-commercial note.
+
+**Verified with `next build && next start` (production mode):**
+- Preview on:
+  - `/` returns 200, titled "Coffee Gruham", with a `noindex, nofollow` meta
+    tag and header.
+  - Optimised images carry the header too.
+  - `robots.txt` is correct.
+  - `/dashboard` redirects (307) to `/login`, and `/api/menu` returns 401.
+- Preview off: no noindex anywhere.
+
+**Control:** the only dashboard login is the BrewSite owner's own account,
+linked to café #1. The café owner gets a login (`npm run create-user`) only
+once they rent the site.
