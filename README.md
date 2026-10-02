@@ -62,6 +62,41 @@ Re-running updates items in place and never duplicates them. With
 any price you could not read with `"published": false` and a `"note"`: it is
 imported hidden, and the owner confirms it in the dashboard.
 
+## Backups
+
+```bash
+npm run backup        # saves backups/brewsite-<date>_<time>.json
+```
+
+The backup captures every table (cafés, logins, menus, gallery, offers and
+upload records) in one consistent snapshot. Login sessions are left out on
+purpose. `backups/` is git-ignored because the files contain login password
+hashes. Copy them somewhere private, never to GitHub. Run a backup before big
+changes and about once a week.
+
+To restore one café, for example after menu items were deleted by mistake:
+
+```bash
+npm run restore -- backups/<file>.json --cafe 1            # preview: shows what would change
+npm run restore -- backups/<file>.json --cafe 1 --apply    # puts it back
+```
+
+This restores that café's details, menu, gallery and offers exactly as they
+were. Logins and other cafés are not touched. A safety backup of the current
+state is saved first, and everything changes in one transaction, so a failure
+leaves the data as it was.
+- If someone edits the dashboard while a restore runs, the restore cancels
+  itself and changes nothing. Run it again.
+- If the database has gained or lost columns since the backup was taken, the
+  preview lists them, and `--apply` also needs `--accept-schema-changes`.
+
+If the whole database is ever lost, create a new one, run `npm run db:push`
+against it, then use `npm run restore -- <file>.json --all --apply`. `--all`
+refuses to run on a database that already has data.
+
+`npm run test:backup` proves that backups restore. It runs on a throwaway
+café and a temporary schema, and needs no dev server.
+
 ## Photo uploads (Cloudflare R2)
 
 Owners can upload their own photos for the hero image, gallery, offers and

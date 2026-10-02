@@ -16,7 +16,10 @@
     "test": "npm run test:cafe && npm run test:menu && npm run test:offers && npm run test:uploads",
     "test:uploads": "node --env-file=.env.local scripts/test-uploads.mjs",
     "import-cafe": "node --env-file=.env.local scripts/import-cafe.mjs",
-    "test:cafe": "node --env-file=.env.local scripts/test-cafe.mjs"
+    "backup": "node --env-file=.env.local scripts/backup.mjs",
+    "restore": "node --env-file=.env.local scripts/restore.mjs",
+    "test:cafe": "node --env-file=.env.local scripts/test-cafe.mjs",
+    "test:backup": "node --env-file=.env.local scripts/test-backup.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

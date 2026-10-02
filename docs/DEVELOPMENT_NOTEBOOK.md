@@ -613,3 +613,50 @@ for their official site, and a few prices are still unconfirmed.
 **Control:** the only dashboard login is the BrewSite owner's own account,
 linked to café #1. The café owner gets a login (`npm run create-user`) only
 once they rent the site.
+
+---
+
+## Milestone 12: Backup and restore
+
+**Why:** the site's content (café details, menu, gallery, offers) lived only
+in the Neon database. Nothing we controlled could undo a mistaken delete in
+the dashboard or recover a lost database.
+
+**Built (branch `backup-restore`):**
+- `npm run backup` writes `backups/brewsite-<date>_<time>.json` (git-ignored,
+  because it contains login password hashes).
+  - Every table except `sessions` is read in one read-only REPEATABLE READ
+    transaction, so the snapshot is consistent.
+  - Each table's id-counter position is recorded too.
+  - Rows go to and from JSON through Postgres (`to_jsonb` /
+    `jsonb_populate_recordset`), so timestamps, calendar dates and prices
+    round-trip exactly.
+- `npm run restore -- <file> --cafe <id> [--apply]` puts one café's details,
+  menu, gallery and offers back exactly as they were.
+  - It previews by default and saves a safety backup first.
+  - It refuses ids that now belong to another café.
+  - It runs as one REPEATABLE READ transaction that first verifies the café
+    still matches the safety snapshot, so an edit made during the restore
+    cancels it instead of being lost.
+  - Id counters only ever move forward.
+  - Column differences since the backup are listed, and need
+    `--accept-schema-changes`.
+- `--all` rebuilds an empty database, refusing if any table has data, and
+  continues id counters from the backed-up positions.
+- Column names in a backup file are checked against the live table, so a
+  tampered file cannot inject SQL. Errors never print `DATABASE_URL`.
+
+**Review:** three independent reviewers, with a skeptic checking each
+finding, confirmed 12 low-severity issues (6 refuted). All were fixed:
+- id counters after a restore
+- concurrent edits during a restore
+- schema drift between backup and database
+- a database URL in an error message
+- the backup path depending on the working directory
+- tests that did not exercise counters, foreign keys or the uploads/users
+  tables, depended on café #1, or had cleanup that could stop part-way
+
+**Tests:** `npm run test:backup`, **59 checks**, needs no dev server. It uses
+two throwaway cafés and a temporary schema with copied foreign keys and its
+own id counters. Café #1 was verified byte-identical after every step, and
+the live data was verified identical to the first real backup afterwards.
