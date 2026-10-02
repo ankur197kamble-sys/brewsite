@@ -43,3 +43,6 @@ next-env.d.ts
 # Customer onboarding data (menus, contact details) lives in the database,
 # not in this public repository.
 /onboarding/
+
+# Database backups contain login password hashes: never commit them.
+/backups/
