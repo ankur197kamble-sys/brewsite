@@ -1,23 +1,32 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getCafe } from "@/app/db/cafe";
 import { getGallery } from "@/app/db/gallery";
 import { getMenu } from "@/app/db/menu";
 import { getOffers } from "@/app/db/offers";
+import { countOrdersSince } from "@/app/db/orders";
 import { normalizeStringList } from "@/app/lib/json";
-import { offerStatus } from "@/app/lib/offers";
+import { offerStatus, today } from "@/app/lib/offers";
 import { requireCafeSession } from "@/app/lib/session";
 import { getSiteCafe } from "@/app/lib/site-cafe";
 import { cafe as fallbackCafe } from "@/app/data/cafe";
 
 export const dynamic = "force-dynamic";
 
+export const metadata: Metadata = {
+  title: "Overview · BrewSite Dashboard",
+};
+
 export default async function Dashboard() {
   const { cafeId } = await requireCafeSession();
-  const [dbCafe, categories, gallery, offers] = await Promise.all([
+  // Midnight in the café's time zone, so "today" matches the café's own day.
+  const startOfDay = new Date(`${today()}T00:00:00+05:30`);
+  const [dbCafe, categories, gallery, offers, ordersToday] = await Promise.all([
     getCafe(cafeId),
     getMenu(cafeId),
     getGallery(cafeId),
     getOffers(cafeId),
+    countOrdersSince(cafeId, startOfDay),
   ]);
 
   const siteCafe = getSiteCafe(dbCafe, fallbackCafe);
@@ -30,7 +39,8 @@ export default async function Dashboard() {
     (offer) => offerStatus(offer) === "live",
   ).length;
 
-  const stats = [
+  const stats: { label: string; value: string; href?: string }[] = [
+    { label: "Orders today", value: String(ordersToday), href: "/dashboard/orders" },
     { label: "Website", value: "Live" },
     { label: "Menu categories", value: String(categories.length) },
     {
@@ -74,16 +84,28 @@ export default async function Dashboard() {
         Manage your café website, menu and customer information from one place.
       </p>
 
-      <div className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {stats.map((stat) => (
-          <div
-            key={stat.label}
-            className="rounded-2xl border border-black/10 bg-white/50 p-6"
-          >
-            <p className="text-sm text-black/50">{stat.label}</p>
-            <p className="mt-2 text-2xl font-semibold">{stat.value}</p>
-          </div>
-        ))}
+      <div className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {stats.map((stat) => {
+          const content = (
+            <>
+              <p className="text-sm text-black/55">{stat.label}</p>
+              <p className="mt-2 text-2xl font-semibold">{stat.value}</p>
+            </>
+          );
+          return stat.href ? (
+            <Link
+              key={stat.label}
+              href={stat.href}
+              className="rounded-2xl border border-black/10 bg-white/50 p-6 transition hover:border-black/25 hover:bg-white/80"
+            >
+              {content}
+            </Link>
+          ) : (
+            <div key={stat.label} className="rounded-2xl border border-black/10 bg-white/50 p-6">
+              {content}
+            </div>
+          );
+        })}
       </div>
 
       <div className="mt-10 flex flex-wrap gap-3">

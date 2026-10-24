@@ -226,3 +226,135 @@ export type UserRow = typeof users.$inferSelect;
 export type GalleryImageRow = typeof galleryImages.$inferSelect;
 export type OfferRow = typeof offers.$inferSelect;
 export type UploadRow = typeof uploads.$inferSelect;
+
+/* ------------------------------------------------------------ ordering */
+
+/**
+ * A place an order can come from: a dining table, or e.g. "Counter" for
+ * takeaway. Each has a long random `token` printed as a QR code; scanning it
+ * is what lets a customer order. The token, not a guessable id, identifies
+ * the table, and it resolves the café — so ordering works per café without
+ * trusting anything else the browser sends.
+ */
+export const cafeTables = pgTable(
+  "cafe_tables",
+  {
+    id: serial("id").primaryKey(),
+    cafeId: integer("cafe_id")
+      .notNull()
+      .references(() => cafes.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    token: text("token").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("cafe_tables_token_unique_idx").on(table.token),
+    index("cafe_tables_cafe_sort_idx").on(table.cafeId, table.sortOrder),
+  ],
+);
+
+/**
+ * An order placed by a customer, paid at the counter. Prices are copied
+ * into order_items when the order is placed, so later menu edits never
+ * change what an existing order costs.
+ *
+ * `publicToken` lets the customer's phone follow its own order without an
+ * account; it is long and random, and the status page shows no phone number.
+ */
+export const orders = pgTable(
+  "orders",
+  {
+    id: serial("id").primaryKey(),
+    cafeId: integer("cafe_id")
+      .notNull()
+      .references(() => cafes.id, { onDelete: "cascade" }),
+    tableId: integer("table_id").references(() => cafeTables.id, {
+      onDelete: "set null",
+    }),
+    /** Copied so the order still reads correctly if the table is renamed. */
+    tableLabel: text("table_label").notNull(),
+    publicToken: text("public_token").notNull(),
+    customerName: text("customer_name").notNull(),
+    /** Only when the customer opts in to loyalty stamps. */
+    customerPhone: text("customer_phone"),
+    note: text("note"),
+    /** received → preparing → ready → completed, or cancelled. */
+    status: text("status").notNull().default("received"),
+    totalPaise: integer("total_paise").notNull(),
+    /** SHA-256 of the client IP with a server secret, for rate limiting only. */
+    clientHash: text("client_hash"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("orders_public_token_unique_idx").on(table.publicToken),
+    index("orders_cafe_status_created_idx").on(
+      table.cafeId,
+      table.status,
+      table.createdAt,
+    ),
+    index("orders_table_created_idx").on(table.tableId, table.createdAt),
+  ],
+);
+
+export const orderItems = pgTable(
+  "order_items",
+  {
+    id: serial("id").primaryKey(),
+    orderId: integer("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    cafeId: integer("cafe_id")
+      .notNull()
+      .references(() => cafes.id, { onDelete: "cascade" }),
+    menuItemId: integer("menu_item_id").references(() => menuItems.id, {
+      onDelete: "set null",
+    }),
+    name: text("name").notNull(),
+    unitPricePaise: integer("unit_price_paise").notNull(),
+    quantity: integer("quantity").notNull(),
+  },
+  (table) => [index("order_items_order_idx").on(table.orderId)],
+);
+
+/**
+ * Loyalty stamps per café and phone number. One stamp per completed order;
+ * every STAMPS_PER_REWARD stamps earns a reward the staff can redeem.
+ */
+export const loyaltyCards = pgTable(
+  "loyalty_cards",
+  {
+    id: serial("id").primaryKey(),
+    cafeId: integer("cafe_id")
+      .notNull()
+      .references(() => cafes.id, { onDelete: "cascade" }),
+    phone: text("phone").notNull(),
+    stamps: integer("stamps").notNull().default(0),
+    rewardsRedeemed: integer("rewards_redeemed").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("loyalty_cards_cafe_phone_unique_idx").on(
+      table.cafeId,
+      table.phone,
+    ),
+  ],
+);
+
+export type CafeTableRow = typeof cafeTables.$inferSelect;
+export type OrderRow = typeof orders.$inferSelect;
+export type OrderItemRow = typeof orderItems.$inferSelect;
+export type LoyaltyCardRow = typeof loyaltyCards.$inferSelect;

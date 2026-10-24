@@ -15,7 +15,7 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen bg-[#f4efe7] text-[#1f1a17]">
       <div className="mx-auto flex min-h-screen w-full max-w-[1400px] flex-col md:flex-row">
-        <aside className="border-b border-black/10 md:w-64 md:shrink-0 md:border-r md:border-b-0">
+        <aside className="border-b border-black/10 md:w-64 md:shrink-0 md:border-r md:border-b-0 print:hidden">
           <div className="flex items-start justify-between p-6 md:block">
             <div>
               <Link
@@ -46,7 +46,7 @@ export default async function DashboardLayout({
           <DashboardNav />
         </aside>
 
-        <main className="flex-1 p-6 md:p-10">{children}</main>
+        <main className="flex-1 p-6 md:p-10 print:p-0">{children}</main>
       </div>
     </div>
   );
