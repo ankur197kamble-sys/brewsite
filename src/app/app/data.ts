@@ -58,8 +58,10 @@ export type AppData = {
 
 /**
  * Everything the app screens need, or null if the café cannot be reached.
- * Unlike the marketing site, the app never falls back to demo content: a
- * customer must never see another café's name or order from a stale menu.
+ * Unlike the marketing site, the app never falls back to the demo café when
+ * the database is down: a customer must never see another café's name or
+ * order from a stale menu. (A café that has not added its own tagline or
+ * photo yet gets the platform's placeholder ones, as on the website.)
  */
 export async function loadAppData(): Promise<AppData | null> {
   const cafeId = getPublicCafeId();

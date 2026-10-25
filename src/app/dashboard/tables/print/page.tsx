@@ -7,6 +7,7 @@ import { listTables } from "@/app/db/orders";
 import { requestOrigin } from "@/app/lib/origin";
 import { requireCafeSession } from "@/app/lib/session";
 import { getSiteCafe } from "@/app/lib/site-cafe";
+import { OriginWarning } from "../origin-warning";
 import { PrintButton } from "./print-button";
 
 export const metadata: Metadata = {
@@ -24,12 +25,13 @@ export default async function PrintTables() {
 
   return (
     <div>
+      <OriginWarning origin={origin} />
       <div className="mb-8 flex flex-wrap items-center gap-3 print:hidden">
         <Link href="/dashboard/tables" className="text-sm text-black/60 underline underline-offset-4">
           ← Tables
         </Link>
         <PrintButton />
-        <p className="text-sm text-black/55">Cut along the dotted lines. Works on any A4 printer.</p>
+        <p className="text-sm text-black/60">Cut along the dotted lines. Works on any A4 printer.</p>
       </div>
 
       {active.length === 0 ? (

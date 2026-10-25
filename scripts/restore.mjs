@@ -311,12 +311,28 @@ await runRestoreTransaction(
        WHERE id = $2`,
       [JSON.stringify(backupCafe), cafeId],
     ),
+    // Past orders link each line to its dish. Deleting the menu below sets
+    // those links to NULL, so remember them and put back the ones whose dish
+    // the backup restores (same id, same café).
+    txn.query(`CREATE TEMP TABLE brewsite_restore_links (id int, menu_item_id int) ON COMMIT DROP`),
+    txn.query(
+      `INSERT INTO brewsite_restore_links
+       SELECT id, menu_item_id FROM ${tableRef(schema, "order_items")} WHERE cafe_id = $1 AND menu_item_id IS NOT NULL`,
+      [cafeId],
+    ),
     // Children before parents: menu items reference their categories.
     ...["menu_items", "gallery_images", "offers", "menu_categories"].map((table) =>
       txn.query(`DELETE FROM ${tableRef(schema, table)} WHERE cafe_id = $1`, [cafeId]),
     ),
     ...CAFE_CONTENT_TABLES.filter((table) => backupContent[table].length > 0).map((table) =>
       insertQuery(txn, table, backupContent[table]),
+    ),
+    txn.query(
+      `UPDATE ${tableRef(schema, "order_items")} AS oi SET menu_item_id = l.menu_item_id
+       FROM brewsite_restore_links AS l
+       WHERE oi.id = l.id AND oi.cafe_id = $1 AND oi.menu_item_id IS NULL
+         AND EXISTS (SELECT 1 FROM ${tableRef(schema, "menu_items")} AS m WHERE m.id = l.menu_item_id AND m.cafe_id = $1)`,
+      [cafeId],
     ),
     // Restored rows keep their old ids. Move each shared id counter forward
     // past them if needed (never backward), so the next dashboard insert

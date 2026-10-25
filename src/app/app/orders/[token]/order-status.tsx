@@ -5,10 +5,11 @@ import { useEffect, useRef } from "react";
 import {
   formatPaise,
   STAMPS_PER_REWARD,
-  stampsTowardsNext,
+  stampsOnCard,
   type OrderStatus,
   type PublicOrderView,
 } from "@/app/lib/orders";
+import { CAFE_TIME_ZONE } from "@/app/lib/cafe-time";
 import { usePublicOrder } from "../../use-order";
 
 const STEPS: { status: OrderStatus; label: string }[] = [
@@ -79,6 +80,7 @@ export function OrderStatusView({ token }: { token: string }) {
 
   const headline = HEADLINE[order.status];
   const active = order.status !== "completed" && order.status !== "cancelled";
+  const stale = state.kind === "ready" && state.stale;
 
   return (
     <main className="app-screen">
@@ -127,18 +129,24 @@ export function OrderStatusView({ token }: { token: string }) {
               );
             })}
           </ol>
-          {active && (
-            <p className="app-muted mt-4 flex items-center gap-2 text-xs">
-              <span aria-hidden="true" className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)] motion-reduce:animate-none" />
-              Updates automatically
-            </p>
-          )}
+          {active &&
+            (stale ? (
+              <p role="status" className="mt-4 flex items-center gap-2 text-xs font-semibold text-red-900">
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-red-800" />
+                No connection. Showing the last update, retrying…
+              </p>
+            ) : (
+              <p className="app-muted mt-4 flex items-center gap-2 text-xs">
+                <span aria-hidden="true" className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)] motion-reduce:animate-none" />
+                Updates automatically
+              </p>
+            ))}
         </section>
       )}
 
       <OrderDetails order={order} />
 
-      {order.loyalty && <StampSummary loyalty={order.loyalty} collected={order.status === "completed"} />}
+      {order.loyalty && order.status !== "cancelled" && <StampSummary loyalty={order.loyalty} />}
 
       <div className="mt-6 grid gap-3">
         <Link href="/app/menu" className="app-btn app-btn-primary app-btn-block">
@@ -157,12 +165,17 @@ function OrderDetails({ order }: { order: PublicOrderView }) {
           {order.customerName}&apos;s order
         </h2>
         <p className="app-muted text-sm">
-          {new Date(order.createdAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
+          {new Date(order.createdAt).toLocaleTimeString("en-IN", {
+            hour: "numeric",
+            minute: "2-digit",
+            timeZone: CAFE_TIME_ZONE,
+          })}
         </p>
       </div>
       <ul className="mt-2 divide-y divide-[var(--line)]">
-        {order.lines.map((line) => (
-          <li key={line.name} className="flex justify-between gap-3 py-2.5">
+        {order.lines.map((line, index) => (
+          // Lines never reorder, and two dishes can share a name.
+          <li key={index} className="flex justify-between gap-3 py-2.5">
             <span>
               <span className="font-semibold tabular-nums">{line.quantity}×</span> {line.name}
             </span>
@@ -179,26 +192,26 @@ function OrderDetails({ order }: { order: PublicOrderView }) {
   );
 }
 
-function StampSummary({
-  loyalty,
-  collected,
-}: {
-  loyalty: NonNullable<PublicOrderView["loyalty"]>;
-  collected: boolean;
-}) {
-  const filled = stampsTowardsNext(loyalty.stamps);
+/**
+ * The stamp card appears once the order is collected (see PublicOrderView);
+ * until then the customer is told a stamp is coming.
+ */
+function StampSummary({ loyalty }: { loyalty: NonNullable<PublicOrderView["loyalty"]> }) {
+  const { card } = loyalty;
   return (
     <Link href="/app/stamps" className="app-card-dark mt-4 block p-5 transition-transform active:scale-[0.99]">
       <p className="text-[0.7rem] font-semibold tracking-[0.18em] text-[var(--accent-soft)] uppercase">
         Loyalty · ending {loyalty.phone}
       </p>
       <p className="app-heading mt-1">
-        {loyalty.rewardsAvailable > 0
-          ? `You have ${loyalty.rewardsAvailable} treat${loyalty.rewardsAvailable === 1 ? "" : "s"} to claim!`
-          : `${filled} of ${STAMPS_PER_REWARD} stamps`}
+        {!card
+          ? "A stamp is on its way"
+          : card.rewardsAvailable > 0
+            ? `You have ${card.rewardsAvailable} treat${card.rewardsAvailable === 1 ? "" : "s"} to claim!`
+            : `${stampsOnCard(card.stamps, card.rewardsAvailable)} of ${STAMPS_PER_REWARD} stamps`}
       </p>
       <p className="mt-1 text-sm text-white/70">
-        {collected ? "This order earned you a stamp. Thank you!" : "Stamps are added when your order is collected."}
+        {card ? "This order earned you a stamp. Thank you!" : "You'll get it when you collect this order at the counter."}
       </p>
     </Link>
   );

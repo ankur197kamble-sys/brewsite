@@ -86,15 +86,22 @@ imported hidden, and the owner confirms it in the dashboard.
    number for loyalty stamps) and place the order. Prices always come from
    the database, never from the phone.
 3. Staff keep **Dashboard → Orders** open on a tablet or laptop. New orders
-   appear within a few seconds, with an optional chime. Each order moves
+   appear within a few seconds, with an optional chime, even while the tab
+   is in the background. Each order moves
    **New → Preparing → Ready → Collected & paid**, or can be cancelled.
    The customer's screen follows along, and shows a large collection ticket
    when the order is ready.
 4. Every collected order with a mobile number earns one stamp. Ten stamps
    earn a treat. Staff check and redeem treats in **Dashboard → Loyalty**.
+   Numbers are not verified (no OTP yet), so a customer's stamp card is
+   only shown on their phone after an order has been collected and paid.
 
-Spam protection: at most 8 orders per table, and 6 from the same internet
-connection, every 10 minutes.
+Order numbers start again at **#1 every day** (café time), so they stay
+short to call out. If a customer's connection drops while ordering, trying
+again never places the order twice.
+
+Spam protection, every 10 minutes: at most 6 orders from one phone, 15 per
+table, and 30 from one internet connection (the café's Wi-Fi counts as one).
 
 The customer app installs from the browser (Android: the in-app **Install**
 button; iPhone: Share → Add to Home Screen). Its name and icon come from the

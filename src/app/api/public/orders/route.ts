@@ -1,13 +1,27 @@
 import { createHash } from "node:crypto";
-import { placeOrder } from "@/app/db/orders";
+import { NextResponse } from "next/server";
+import { placeOrder, type RateLimit } from "@/app/db/orders";
 import { validateOrderInput } from "@/app/lib/orders";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
 
+/** Hashed with a server secret: only ever compared, never turned back into the value. */
+function secretHash(value: string): string {
+  return createHash("sha256").update(`${value}|${process.env.DATABASE_URL ?? ""}`).digest("hex");
+}
+
+const LIMIT_MESSAGE: Record<RateLimit, string> = {
+  device: "You've placed several orders in the last few minutes. Please wait a little, or ask the staff.",
+  table: "This table has placed a lot of orders just now. Please ask the staff.",
+  network: "Lots of orders are arriving just now. Please wait a few minutes, or order at the counter.",
+};
+
 /**
  * Places a customer order. Public by design (customers have no login), so
- * it is gated by the table's unguessable QR token, rate-limited per table and
- * per client, and accepts only dish ids and quantities: names and prices are
- * read from the database.
+ * it is gated by the table's unguessable QR token, rate-limited per device,
+ * per table and per network, and accepts only dish ids and quantities:
+ * names and prices are read from the database. Retrying with the same
+ * idempotency key returns the original order instead of placing another
+ * (or, if the order was changed in between, says the first one went through).
  */
 export async function POST(request: Request) {
   try {
@@ -15,12 +29,8 @@ export async function POST(request: Request) {
     if (!parsed.ok) return apiError(parsed.error, 400);
 
     const ip = (request.headers.get("x-forwarded-for") ?? "").split(",")[0]?.trim() || "unknown";
-    // Hashed with a server secret: only ever compared, never turned back into an IP.
-    const clientHash = createHash("sha256")
-      .update(`${ip}|${process.env.DATABASE_URL ?? ""}`)
-      .digest("hex");
+    const result = await placeOrder(parsed.value, secretHash(`ip:${ip}`), secretHash(`device:${parsed.value.deviceId}`));
 
-    const result = await placeOrder(parsed.value, clientHash);
     switch (result.status) {
       case "ok":
         return apiSuccess({ token: result.token, number: result.number }, 201);
@@ -28,8 +38,21 @@ export async function POST(request: Request) {
         return apiError("This table QR code is no longer valid. Please ask the staff.", 404);
       case "unavailable_items":
         return apiError("Some items in your order are no longer available. Please refresh the menu.", 409);
+      case "too_large":
+        return apiError("This order is too large to place from the app. Please order at the counter.", 400);
       case "rate_limited":
-        return apiError("Too many orders from this table just now. Please ask the staff.", 429);
+        return apiError(LIMIT_MESSAGE[result.limit], 429);
+      case "already_placed":
+        // A retry whose contents changed after the first try went through:
+        // point the customer at the order the kitchen actually has.
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Your earlier order #${result.number} already went through. Check it before ordering anything else.`,
+            data: { token: result.token, number: result.number },
+          },
+          { status: 409 },
+        );
     }
   } catch (error) {
     console.error("Failed to place order:", error);

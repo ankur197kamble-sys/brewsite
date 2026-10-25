@@ -138,7 +138,7 @@ export default async function Home() {
               alt={`Inside ${siteCafe.name}`}
               className="object-cover"
               fill
-              priority
+              preload
               sizes="100vw"
             />
           </div>

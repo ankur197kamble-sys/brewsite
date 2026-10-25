@@ -2,19 +2,29 @@
 
 import Link from "next/link";
 import { formatPaise, STATUS_LABEL } from "@/app/lib/orders";
-import { useSavedOrders, type SavedOrder } from "../storage";
+import { CAFE_TIME_ZONE } from "@/app/lib/cafe-time";
+import { useHydrated, useSavedOrders, type SavedOrder } from "../storage";
 import { usePublicOrder } from "../use-order";
 
 const SHOWN = 10;
 
-/** Orders placed from this phone, newest first; an active one updates live. */
+/**
+ * Orders placed from this phone, newest first. Every row keeps itself up to
+ * date while its order is in progress (finished orders are read once).
+ */
 export function OrdersList() {
+  const hydrated = useHydrated();
   const orders = useSavedOrders().slice(0, SHOWN);
 
   return (
     <main className="app-screen">
       <h1 className="app-title">My orders</h1>
-      {orders.length === 0 ? (
+      {!hydrated ? (
+        <div aria-busy="true" className="mt-6 space-y-3">
+          <div className="app-skeleton h-20 w-full" />
+          <div className="app-skeleton h-20 w-full" />
+        </div>
+      ) : orders.length === 0 ? (
         <div className="app-card mt-6 p-6 text-center">
           <p className="app-heading">No orders yet</p>
           <p className="app-muted mt-2 leading-7">
@@ -26,8 +36,8 @@ export function OrdersList() {
         </div>
       ) : (
         <ul className="app-stagger mt-6 space-y-3">
-          {orders.map((order, index) => (
-            <OrderRow key={order.token} order={order} live={index === 0} />
+          {orders.map((order) => (
+            <OrderRow key={order.token} order={order} />
           ))}
         </ul>
       )}
@@ -35,8 +45,8 @@ export function OrdersList() {
   );
 }
 
-function OrderRow({ order, live }: { order: SavedOrder; live: boolean }) {
-  const state = usePublicOrder(order.token, { live });
+function OrderRow({ order }: { order: SavedOrder }) {
+  const state = usePublicOrder(order.token);
   const view = state.kind === "ready" ? state.order : null;
   const active = view && view.status !== "completed" && view.status !== "cancelled";
 
@@ -69,7 +79,13 @@ function OrderRow({ order, live }: { order: SavedOrder; live: boolean }) {
             <span className="app-skeleton mt-2 block h-3.5 w-40" />
           )}
           <span className="app-muted mt-1 block text-xs">
-            {new Date(order.placedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+            {new Date(order.placedAt).toLocaleString("en-IN", {
+              day: "numeric",
+              month: "short",
+              hour: "numeric",
+              minute: "2-digit",
+              timeZone: CAFE_TIME_ZONE,
+            })}
             {view ? ` · ${formatPaise(view.totalPaise)}` : ""}
           </span>
         </span>

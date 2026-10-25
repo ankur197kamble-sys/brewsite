@@ -1,6 +1,7 @@
 import { asRecord } from "@/app/lib/json";
 import { parseImageUrl } from "@/app/lib/image-hosts";
 import { invalid, parseId, type Validated } from "@/app/lib/validation";
+import { CAFE_TIME_ZONE } from "@/app/lib/cafe-time";
 
 const MAX_TITLE_LENGTH = 90;
 const MAX_DESCRIPTION_LENGTH = 400;
@@ -33,11 +34,9 @@ export type OfferInput = {
 
 /**
  * Offer dates are the café's calendar days, so "today" must be read in the
- * café's time zone rather than the server's — hosts typically run on UTC,
- * which would start and end Indian offers 5½ hours late. Platform default
- * until time zone becomes a per-café setting.
+ * café's time zone rather than the server's (see lib/cafe-time).
  */
-export const CAFE_TIME_ZONE = "Asia/Kolkata";
+export { CAFE_TIME_ZONE };
 
 /** Today's calendar date in the café's time zone, as the columns store it. */
 export function today(): string {

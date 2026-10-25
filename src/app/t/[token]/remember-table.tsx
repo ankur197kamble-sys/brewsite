@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { saveTable } from "@/app/app/storage";
+// Imported for its side effect: catches the app-install offer from the first page.
+import "@/app/app/install";
 
 /** Remembers the scanned table on this phone, then opens the menu. */
 export function RememberTable({ token, label }: { token: string; label: string }) {

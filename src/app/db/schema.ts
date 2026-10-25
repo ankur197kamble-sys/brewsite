@@ -278,6 +278,16 @@ export const orders = pgTable(
     /** Copied so the order still reads correctly if the table is renamed. */
     tableLabel: text("table_label").notNull(),
     publicToken: text("public_token").notNull(),
+    /**
+     * What staff call out: 1, 2, 3… starting again each day (café time), so
+     * numbers stay short and reveal nothing about other cafés.
+     */
+    orderNumber: integer("order_number").notNull(),
+    /**
+     * Sent by the phone with each checkout attempt. A retry after a lost
+     * response carries the same key and gets the original order back.
+     */
+    idempotencyKey: text("idempotency_key"),
     customerName: text("customer_name").notNull(),
     /** Only when the customer opts in to loyalty stamps. */
     customerPhone: text("customer_phone"),
@@ -287,6 +297,8 @@ export const orders = pgTable(
     totalPaise: integer("total_paise").notNull(),
     /** SHA-256 of the client IP with a server secret, for rate limiting only. */
     clientHash: text("client_hash"),
+    /** SHA-256 of the phone's random app id with a server secret, for rate limiting only. */
+    deviceHash: text("device_hash"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -296,6 +308,9 @@ export const orders = pgTable(
   },
   (table) => [
     uniqueIndex("orders_public_token_unique_idx").on(table.publicToken),
+    uniqueIndex("orders_cafe_idempotency_unique_idx").on(table.cafeId, table.idempotencyKey),
+    // Rate limits, today's numbering and today's totals all read recent orders.
+    index("orders_cafe_created_idx").on(table.cafeId, table.createdAt),
     index("orders_cafe_status_created_idx").on(
       table.cafeId,
       table.status,

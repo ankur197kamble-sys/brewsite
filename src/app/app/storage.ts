@@ -10,8 +10,12 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
  *
  * Reads go through useSyncExternalStore, so the server render and the first
  * browser render agree (nothing stored) and every screen updates as soon as
- * anything is saved. Storage can be unavailable (private browsing, blocked
- * site data); the app then works but does not remember.
+ * anything is saved. Screens that depend on stored data check useHydrated()
+ * first, so a slow phone shows a placeholder rather than a wrong empty state.
+ *
+ * Storage can be unavailable (private browsing, blocked site data, full
+ * storage). Values then live in memory instead: ordering still works for the
+ * visit, the phone just will not remember it next time.
  */
 
 const KEYS = {
@@ -19,6 +23,8 @@ const KEYS = {
   cart: "brewsite.cart",
   orders: "brewsite.orders",
   customer: "brewsite.customer",
+  device: "brewsite.device",
+  checkoutKey: "brewsite.checkoutKey",
 } as const;
 
 /** A scanned table is remembered for one visit, not forever. */
@@ -26,7 +32,15 @@ const TABLE_TTL_MS = 4 * 60 * 60 * 1000;
 const MAX_REMEMBERED_ORDERS = 20;
 const CHANGE_EVENT = "brewsite-storage";
 
+/**
+ * Writes that could not be saved to localStorage, for this visit. Checked
+ * first, so a value that failed to save (or to be removed: null) is never
+ * hidden by an older saved one.
+ */
+const memory = new Map<string, string | null>();
+
 function readRaw(key: string): string | null {
+  if (memory.has(key)) return memory.get(key) ?? null;
   try {
     return window.localStorage.getItem(key);
   } catch {
@@ -35,13 +49,27 @@ function readRaw(key: string): string | null {
 }
 
 function write(key: string, value: unknown) {
+  const raw = value === null ? null : JSON.stringify(value);
   try {
-    if (value === null) window.localStorage.removeItem(key);
-    else window.localStorage.setItem(key, JSON.stringify(value));
+    if (raw === null) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, raw);
+    memory.delete(key);
   } catch {
-    // Storage unavailable: the app works, it just will not remember.
+    // Storage unavailable or full: kept in memory for this visit instead.
+    memory.set(key, raw);
   }
   window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
+const noSubscribe = () => () => {};
+
+/** False during the server render and the first browser render, then true. */
+export function useHydrated(): boolean {
+  return useSyncExternalStore(
+    noSubscribe,
+    () => true,
+    () => false,
+  );
 }
 
 function parse<T>(raw: string | null): T | null {
@@ -68,6 +96,12 @@ function useRaw(key: string): string | null {
     () => readRaw(key),
     () => null,
   );
+}
+
+/** Keeps only cart lines for dishes still on the menu (a dish may have been hidden since). */
+export function pruneCart(cart: Cart, menuIds: Set<number>): Cart | null {
+  const kept = Object.fromEntries(Object.entries(cart).filter(([id]) => menuIds.has(Number(id))));
+  return Object.keys(kept).length === Object.keys(cart).length ? null : kept;
 }
 
 /* ------------------------------------------------------------------ table */
@@ -160,4 +194,57 @@ export function useCustomer(): SavedCustomer {
 
 export function saveCustomer(customer: SavedCustomer) {
   write(KEYS.customer, customer);
+}
+
+/* ------------------------------------------------------------ random ids */
+
+/** 32 random hex characters. Works on plain-http addresses too, unlike crypto.randomUUID. */
+export function randomId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** A retry key lasts this long: enough to retry through a dropped connection, not into a later visit. */
+const CHECKOUT_KEY_TTL_MS = 30 * 60 * 1000;
+
+type CheckoutKey = { key: string; table: string; createdAt: number };
+
+/**
+ * The retry key for the order being checked out at `tableToken`. Kept on the
+ * phone until the order is confirmed, so trying again (even after leaving
+ * the screen) can never place the same order twice. A key from another
+ * table, or older than 30 minutes, is replaced: a later visit is a new order.
+ */
+export function pendingCheckoutKey(tableToken: string): string {
+  const existing = parse<CheckoutKey>(readRaw(KEYS.checkoutKey));
+  if (
+    existing &&
+    typeof existing.key === "string" &&
+    /^[A-Za-z0-9-]{16,64}$/.test(existing.key) &&
+    existing.table === tableToken &&
+    typeof existing.createdAt === "number" &&
+    Date.now() - existing.createdAt < CHECKOUT_KEY_TTL_MS
+  ) {
+    return existing.key;
+  }
+  const key = randomId();
+  write(KEYS.checkoutKey, { key, table: tableToken, createdAt: Date.now() } satisfies CheckoutKey);
+  return key;
+}
+
+export function clearCheckoutKey() {
+  write(KEYS.checkoutKey, null);
+}
+
+/**
+ * A random id for this phone, made once and kept. It identifies nothing
+ * about the customer; the café uses it only to slow down repeated orders
+ * from one device.
+ */
+export function deviceId(): string {
+  const existing = parse<string>(readRaw(KEYS.device));
+  if (typeof existing === "string" && /^[A-Za-z0-9-]{16,64}$/.test(existing)) return existing;
+  const id = randomId();
+  write(KEYS.device, id);
+  return id;
 }

@@ -4,9 +4,9 @@ import { getCafe } from "@/app/db/cafe";
 import { getGallery } from "@/app/db/gallery";
 import { getMenu } from "@/app/db/menu";
 import { getOffers } from "@/app/db/offers";
-import { countOrdersSince } from "@/app/db/orders";
+import { todayTotals } from "@/app/db/orders";
 import { normalizeStringList } from "@/app/lib/json";
-import { offerStatus, today } from "@/app/lib/offers";
+import { offerStatus } from "@/app/lib/offers";
 import { requireCafeSession } from "@/app/lib/session";
 import { getSiteCafe } from "@/app/lib/site-cafe";
 import { cafe as fallbackCafe } from "@/app/data/cafe";
@@ -19,14 +19,12 @@ export const metadata: Metadata = {
 
 export default async function Dashboard() {
   const { cafeId } = await requireCafeSession();
-  // Midnight in the café's time zone, so "today" matches the café's own day.
-  const startOfDay = new Date(`${today()}T00:00:00+05:30`);
-  const [dbCafe, categories, gallery, offers, ordersToday] = await Promise.all([
+  const [dbCafe, categories, gallery, offers, totals] = await Promise.all([
     getCafe(cafeId),
     getMenu(cafeId),
     getGallery(cafeId),
     getOffers(cafeId),
-    countOrdersSince(cafeId, startOfDay),
+    todayTotals(cafeId),
   ]);
 
   const siteCafe = getSiteCafe(dbCafe, fallbackCafe);
@@ -40,7 +38,7 @@ export default async function Dashboard() {
   ).length;
 
   const stats: { label: string; value: string; href?: string }[] = [
-    { label: "Orders today", value: String(ordersToday), href: "/dashboard/orders" },
+    { label: "Orders today", value: String(totals.orders), href: "/dashboard/orders" },
     { label: "Website", value: "Live" },
     { label: "Menu categories", value: String(categories.length) },
     {

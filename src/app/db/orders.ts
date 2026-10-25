@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { db } from "@/app/db";
 import {
   cafeTables,
@@ -14,7 +14,7 @@ import {
   ACTIVE_STATUSES,
   canMoveTo,
   isOrderStatus,
-  orderNumber,
+  MAX_ORDER_TOTAL_PAISE,
   priceToPaise,
   rewardsAvailable,
   STAMPS_PER_REWARD,
@@ -25,7 +25,9 @@ import {
   type PublicOrderView,
   type StaffOrderView,
   type TableView,
+  type TodayTotals,
 } from "@/app/lib/orders";
+import { CAFE_TIME_ZONE } from "@/app/lib/cafe-time";
 
 /**
  * Ordering data access. Staff functions take the cafeId from the session and
@@ -111,40 +113,105 @@ export async function getActiveTableByToken(token: string) {
 
 /* ------------------------------------------------------------- placing */
 
-/** Per table and per client, within RATE_WINDOW_MS, to stop spam orders. */
-const RATE_WINDOW_MS = 10 * 60 * 1000;
-const MAX_ORDERS_PER_TABLE = 8;
-const MAX_ORDERS_PER_CLIENT = 6;
+/**
+ * Spam limits within RATE_WINDOW_SECONDS.
+ * - Per phone (the app's random id): stops one customer's accidental or
+ *   playful repeats. A script can rotate the id, so it is not the ceiling.
+ * - Per table: the real ceiling for anyone holding a table's QR code, with
+ *   room for a shared "Counter" QR at a busy moment.
+ * - Per network: every customer on the café's Wi-Fi shares one internet
+ *   address, so this is set for a full café, as a backstop across tables.
+ */
+const RATE_WINDOW_SECONDS = 10 * 60;
+export const MAX_ORDERS_PER_DEVICE = 6;
+export const MAX_ORDERS_PER_TABLE = 15;
+export const MAX_ORDERS_PER_NETWORK = 30;
+
+/** pg_advisory_xact_lock(ORDER_LOCK, cafeId): one order at a time per café. */
+const ORDER_LOCK = 0x6f72; // "or"
+
+export type RateLimit = "device" | "table" | "network";
 
 export type PlaceOrderResult =
   | { status: "ok"; token: string; number: number }
   | { status: "unknown_table" }
   | { status: "unavailable_items"; names: string[] }
-  | { status: "rate_limited" };
+  | { status: "too_large" }
+  | { status: "rate_limited"; limit: RateLimit }
+  /** The retry key belongs to an order that went through with different contents. */
+  | { status: "already_placed"; token: string; number: number };
+
+type PlaceOutcome = "ok" | "existing" | "already_placed" | `limit_${RateLimit}`;
+
+/**
+ * True when order `o` is exactly what this request asks for: same table,
+ * name, number, note and dishes. A retry is only "the same order" if nothing
+ * was changed in between; otherwise the customer is told the earlier one
+ * went through, instead of their changes being dropped without a word.
+ */
+function sameOrderAs(input: OrderInput, tableId: SQL) {
+  const requested = JSON.stringify(
+    input.lines.map((line) => ({ menu_item_id: line.menuItemId, quantity: line.quantity })),
+  );
+  return sql`(
+    o.table_id IS NOT DISTINCT FROM ${tableId}
+    AND o.customer_name = ${input.customerName}::text
+    AND o.customer_phone IS NOT DISTINCT FROM ${input.customerPhone}::text
+    AND o.note IS NOT DISTINCT FROM ${input.note}::text
+    AND (
+      SELECT jsonb_agg(jsonb_build_object('menu_item_id', i.menu_item_id, 'quantity', i.quantity) ORDER BY i.menu_item_id)
+      FROM ${orderItems} i WHERE i.order_id = o.id
+    ) = (
+      SELECT jsonb_agg(jsonb_build_object('menu_item_id', r.menu_item_id, 'quantity', r.quantity) ORDER BY r.menu_item_id)
+      FROM jsonb_to_recordset(${requested}::jsonb) AS r(menu_item_id int, quantity int)
+    )
+  )`;
+}
+
+/**
+ * A retry of an order that already went through, found by its key before
+ * anything else is checked: by then a dish may have sold out or the table's
+ * QR been switched off, and the customer must still get their order back.
+ */
+async function findRetriedOrder(input: OrderInput): Promise<PlaceOrderResult | null> {
+  if (!input.idempotencyKey) return null;
+  const result = await db.execute(sql`
+    SELECT o.order_number, o.public_token, ${sameOrderAs(input, sql`t.id`)} AS same
+    FROM ${orders} o
+    JOIN ${cafeTables} t ON t.cafe_id = o.cafe_id
+    WHERE t.token = ${input.tableToken}::text AND o.idempotency_key = ${input.idempotencyKey}::text
+    LIMIT 1
+  `);
+  const row = result.rows[0] as { order_number: number; public_token: string; same: boolean } | undefined;
+  if (!row) return null;
+  const same = Boolean(row.same);
+  return { status: same ? "ok" : "already_placed", token: row.public_token, number: Number(row.order_number) };
+}
 
 /**
  * Places an order from a table's QR token. Item names and prices come from
  * the database — the client sends only ids and quantities — and only
  * published items from that table's own café can be ordered.
+ *
+ * The limit checks, the retry check, the day's order number and the insert
+ * run in one transaction behind a per-café lock. Neon's HTTP driver has no
+ * interactive transactions, so this is a batch of two statements: the lock,
+ * then one statement that reads (with a snapshot taken after the lock) and
+ * writes. Parallel requests therefore cannot slip past a limit, two orders
+ * can never get the same number, and a retry of the same checkout (same
+ * idempotency key) returns the original order instead of a second one.
  */
-export async function placeOrder(input: OrderInput, clientHash: string | null): Promise<PlaceOrderResult> {
+export async function placeOrder(
+  input: OrderInput,
+  clientHash: string,
+  deviceHash: string,
+): Promise<PlaceOrderResult> {
+  const retried = await findRetriedOrder(input);
+  if (retried) return retried;
+
   const table = await getActiveTableByToken(input.tableToken);
   if (!table) return { status: "unknown_table" };
   const cafeId = table.cafeId;
-
-  const since = new Date(Date.now() - RATE_WINDOW_MS);
-  const [{ byTable, byClient }] = await db
-    .select({
-      byTable: sql<number>`count(*) filter (where ${orders.tableId} = ${table.id})::int`,
-      byClient: clientHash
-        ? sql<number>`count(*) filter (where ${orders.clientHash} = ${clientHash})::int`
-        : sql<number>`0`,
-    })
-    .from(orders)
-    .where(and(eq(orders.cafeId, cafeId), gte(orders.createdAt, since)));
-  if (byTable >= MAX_ORDERS_PER_TABLE || byClient >= MAX_ORDERS_PER_CLIENT) {
-    return { status: "rate_limited" };
-  }
 
   const ids = input.lines.map((line) => line.menuItemId);
   const available = await db
@@ -180,25 +247,79 @@ export async function placeOrder(input: OrderInput, clientHash: string | null): 
     return { status: "unavailable_items", names: unpriced.map((line) => line.name) };
   }
   const total = lines.reduce((sum, line) => sum + line.unit_price_paise * line.quantity, 0);
+  // Also keeps every amount inside the 32-bit paise columns.
+  if (lines.some((line) => line.unit_price_paise > MAX_ORDER_TOTAL_PAISE) || total > MAX_ORDER_TOTAL_PAISE) {
+    return { status: "too_large" };
+  }
   const token = newToken();
 
-  // One statement, so an order can never exist without its items.
-  const result = await db.execute(sql`
-    WITH new_order AS (
-      INSERT INTO ${orders} (cafe_id, table_id, table_label, public_token, customer_name, customer_phone, note, total_paise, client_hash)
-      VALUES (${cafeId}, ${table.id}, ${table.label}, ${token}, ${input.customerName}, ${input.customerPhone}, ${input.note}, ${total}, ${clientHash})
-      RETURNING id
-    ), new_items AS (
-      INSERT INTO ${orderItems} (order_id, cafe_id, menu_item_id, name, unit_price_paise, quantity)
-      SELECT new_order.id, ${cafeId}, l.menu_item_id, l.name, l.unit_price_paise, l.quantity
-      FROM new_order, jsonb_to_recordset(${JSON.stringify(lines)}::jsonb)
-        AS l(menu_item_id int, name text, unit_price_paise int, quantity int)
-      RETURNING 1
-    )
-    SELECT id FROM new_order
-  `);
-  const id = Number((result.rows[0] as { id: number }).id);
-  return { status: "ok", token, number: orderNumber(id) };
+  const [, placed] = await db.batch([
+    db.execute(sql`SELECT pg_advisory_xact_lock(${ORDER_LOCK}::int, ${cafeId}::int)`),
+    // One statement, so an order can never exist without its items.
+    db.execute(sql`
+      WITH existing AS (
+        -- The same key placed moments ago by a parallel request.
+        SELECT o.order_number, o.public_token, ${sameOrderAs(input, sql`${table.id}::int`)} AS same
+        FROM ${orders} o
+        WHERE o.cafe_id = ${cafeId}::int AND o.idempotency_key = ${input.idempotencyKey}::text
+      ), recent AS (
+        SELECT
+          count(*) FILTER (WHERE device_hash = ${deviceHash}::text)::int AS by_device,
+          count(*) FILTER (WHERE table_id = ${table.id}::int)::int AS by_table,
+          count(*) FILTER (WHERE client_hash = ${clientHash}::text)::int AS by_network
+        FROM ${orders}
+        WHERE cafe_id = ${cafeId}::int
+          AND created_at >= now() - make_interval(secs => ${RATE_WINDOW_SECONDS}::int)
+      ), verdict AS (
+        SELECT CASE
+          WHEN EXISTS (SELECT 1 FROM existing WHERE same) THEN 'existing'
+          WHEN EXISTS (SELECT 1 FROM existing) THEN 'already_placed'
+          WHEN by_device >= ${MAX_ORDERS_PER_DEVICE}::int THEN 'limit_device'
+          WHEN by_table >= ${MAX_ORDERS_PER_TABLE}::int THEN 'limit_table'
+          WHEN by_network >= ${MAX_ORDERS_PER_NETWORK}::int THEN 'limit_network'
+          ELSE 'ok'
+        END AS outcome
+        FROM recent
+      ), next_number AS (
+        -- Numbers restart at 1 each day, in the café's time zone.
+        SELECT coalesce(max(order_number), 0) + 1 AS n FROM ${orders}
+        WHERE cafe_id = ${cafeId}::int
+          AND created_at >= date_trunc('day', now() AT TIME ZONE ${CAFE_TIME_ZONE}::text) AT TIME ZONE ${CAFE_TIME_ZONE}::text
+      ), new_order AS (
+        INSERT INTO ${orders} (
+          cafe_id, table_id, table_label, public_token, order_number, idempotency_key,
+          customer_name, customer_phone, note, total_paise, client_hash, device_hash
+        )
+        SELECT
+          ${cafeId}::int, ${table.id}::int, ${table.label}::text, ${token}::text, next_number.n,
+          ${input.idempotencyKey}::text, ${input.customerName}::text, ${input.customerPhone}::text,
+          ${input.note}::text, ${total}::int, ${clientHash}::text, ${deviceHash}::text
+        FROM next_number, verdict
+        WHERE verdict.outcome = 'ok'
+        RETURNING id, order_number, public_token
+      ), new_items AS (
+        INSERT INTO ${orderItems} (order_id, cafe_id, menu_item_id, name, unit_price_paise, quantity)
+        SELECT new_order.id, ${cafeId}::int, l.menu_item_id, l.name, l.unit_price_paise, l.quantity
+        FROM new_order, jsonb_to_recordset(${JSON.stringify(lines)}::jsonb)
+          AS l(menu_item_id int, name text, unit_price_paise int, quantity int)
+        RETURNING 1
+      )
+      SELECT
+        verdict.outcome,
+        coalesce((SELECT order_number FROM new_order), (SELECT order_number FROM existing)) AS order_number,
+        coalesce((SELECT public_token FROM new_order), (SELECT public_token FROM existing)) AS public_token
+      FROM verdict
+    `),
+  ]);
+
+  const row = placed.rows[0] as { outcome: PlaceOutcome; order_number: number | null; public_token: string | null };
+  if (row.outcome === "ok" || row.outcome === "existing") {
+    return { status: "ok", token: String(row.public_token), number: Number(row.order_number) };
+  }
+  if (row.outcome === "already_placed") {
+    return { status: "already_placed", token: String(row.public_token), number: Number(row.order_number) };
+  }
+  return { status: "rate_limited", limit: row.outcome.slice("limit_".length) as RateLimit };
 }
 
 /* ------------------------------------------------------------- reading */
@@ -229,24 +350,30 @@ export async function getPublicOrder(token: string): Promise<PublicOrderView | u
   if (!row) return undefined;
 
   const lines = (await linesFor([row.id])).get(row.id) ?? [];
+  const status = statusOf(row);
   let loyalty: PublicOrderView["loyalty"] = null;
   if (row.customerPhone) {
-    const [card] = await db
-      .select()
-      .from(loyaltyCards)
-      .where(and(eq(loyaltyCards.cafeId, row.cafeId), eq(loyaltyCards.phone, row.customerPhone)))
-      .limit(1);
-    loyalty = {
-      phone: row.customerPhone.slice(-4),
-      stamps: card?.stamps ?? 0,
-      rewardsAvailable: card ? rewardsAvailable(card.stamps, card.rewardsRedeemed) : 0,
-    };
+    // The card only after this order was collected and paid in person: the
+    // number is not verified, so it must not open someone else's card.
+    let card: { stamps: number; rewardsAvailable: number } | null = null;
+    if (status === "completed") {
+      const [found] = await db
+        .select()
+        .from(loyaltyCards)
+        .where(and(eq(loyaltyCards.cafeId, row.cafeId), eq(loyaltyCards.phone, row.customerPhone)))
+        .limit(1);
+      card = {
+        stamps: found?.stamps ?? 0,
+        rewardsAvailable: found ? rewardsAvailable(found.stamps, found.rewardsRedeemed) : 0,
+      };
+    }
+    loyalty = { phone: row.customerPhone.slice(-4), card };
   }
 
   return {
     token: row.publicToken,
-    number: orderNumber(row.id),
-    status: statusOf(row),
+    number: row.orderNumber,
+    status,
     tableLabel: row.tableLabel,
     customerName: row.customerName,
     totalPaise: row.totalPaise,
@@ -274,7 +401,7 @@ export async function listStaffOrders(cafeId: number): Promise<StaffOrderView[]>
   const lines = await linesFor(rows.map((row) => row.id));
   return rows.map((row) => ({
     id: row.id,
-    number: orderNumber(row.id),
+    number: row.orderNumber,
     status: statusOf(row),
     tableLabel: row.tableLabel,
     customerName: row.customerName,
@@ -286,12 +413,26 @@ export async function listStaffOrders(cafeId: number): Promise<StaffOrderView[]>
   }));
 }
 
-export async function countOrdersSince(cafeId: number, since: Date): Promise<number> {
+/**
+ * Today's orders, and those collected and paid, since midnight in the café's
+ * time zone. Counted in the database, so a long day is never cut short by
+ * the staff list's 12-hour window.
+ */
+export async function todayTotals(cafeId: number): Promise<TodayTotals> {
   const [row] = await db
-    .select({ n: sql<number>`count(*)::int` })
+    .select({
+      orders: sql<number>`count(*)::int`,
+      collected: sql<number>`count(*) filter (where ${orders.status} = 'completed')::int`,
+      collectedPaise: sql<number>`coalesce(sum(${orders.totalPaise}) filter (where ${orders.status} = 'completed'), 0)::int`,
+    })
     .from(orders)
-    .where(and(eq(orders.cafeId, cafeId), gte(orders.createdAt, since)));
-  return row?.n ?? 0;
+    .where(
+      and(
+        eq(orders.cafeId, cafeId),
+        sql`${orders.createdAt} >= date_trunc('day', now() AT TIME ZONE ${CAFE_TIME_ZONE}::text) AT TIME ZONE ${CAFE_TIME_ZONE}::text`,
+      ),
+    );
+  return { orders: row?.orders ?? 0, collected: row?.collected ?? 0, collectedPaise: row?.collectedPaise ?? 0 };
 }
 
 /* ------------------------------------------------------------ updating */
@@ -336,8 +477,16 @@ export async function updateOrderStatus(
     SELECT count(*)::int AS moved FROM moved
   `);
   const moved = Number((result.rows[0] as { moved: number }).moved);
-  // Someone else changed it in between: report the state it is really in.
-  if (moved === 0) return { status: "invalid_transition", from };
+  if (moved === 0) {
+    // Someone else changed it in between: report the state it is really in.
+    const [now] = await db
+      .select({ status: orders.status })
+      .from(orders)
+      .where(and(eq(orders.cafeId, cafeId), eq(orders.id, orderId)))
+      .limit(1);
+    if (!now) return { status: "not_found" };
+    return { status: "invalid_transition", from: isOrderStatus(now.status) ? now.status : from };
+  }
   return { status: "ok" };
 }
 

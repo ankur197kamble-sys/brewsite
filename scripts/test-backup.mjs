@@ -92,6 +92,25 @@ async function main() {
     [testCafeId, `cafes/${testCafeId}/test-${run}.webp`],
   );
 
+  // Ordering data, so every backed-up table has rows of its own to compare:
+  // a table, a past order whose line points at a dish (restoring the menu
+  // must keep that link) and a loyalty card.
+  const [{ id: latteId }] = await sql.query(`SELECT id FROM menu_items WHERE cafe_id = $1 AND name = 'Latte'`, [testCafeId]);
+  const [orderTable] = await sql.query(
+    `INSERT INTO cafe_tables (cafe_id, label, token) VALUES ($1, 'Table 1', $2) RETURNING id`,
+    [testCafeId, `test-${run}-table-token`],
+  );
+  const [pastOrder] = await sql.query(
+    `INSERT INTO orders (cafe_id, table_id, table_label, public_token, order_number, customer_name, total_paise)
+     VALUES ($1, $2, 'Table 1', $3, 1, 'Test', 24950) RETURNING id`,
+    [testCafeId, orderTable.id, `test-${run}-order-token`],
+  );
+  await sql.query(`INSERT INTO loyalty_cards (cafe_id, phone, stamps) VALUES ($1, '919800000002', 3)`, [testCafeId]);
+  await sql.query(
+    `INSERT INTO order_items (order_id, cafe_id, menu_item_id, name, unit_price_paise, quantity) VALUES ($1, $2, $3, 'Latte', 24950, 1)`,
+    [pastOrder.id, testCafeId, latteId],
+  );
+
   // A second café whose row ids the clash test borrows, so café #1 is never involved.
   const otherCafeId = await createCafe("other");
   const [otherCategory] = await sql.query(`INSERT INTO menu_categories (cafe_id, name) VALUES ($1, 'Other') RETURNING id`, [otherCafeId]);
@@ -160,6 +179,8 @@ async function main() {
   result = cli("restore.mjs", [backupFile, "--cafe", String(testCafeId), "--apply", "--safety-dir", safetyDir]);
   check("restore succeeds", result.code === 0, result.out);
   check("café is exactly as backed up (ids, prices, dates, timestamps)", (await snapshot(testCafeId)) === original);
+  const [pastLine] = await sql.query(`SELECT menu_item_id FROM order_items WHERE order_id = $1`, [pastOrder.id]);
+  check("past orders keep their link to the restored dish", pastLine?.menu_item_id === latteId, JSON.stringify(pastLine));
   const safetyFiles = existsSync(safetyDir) ? readdirSync(safetyDir).sort() : [];
   check("a safety backup was written before each attempt", safetyFiles.length === 2, safetyFiles.join(", "));
   if (safetyFiles.length > 0) {

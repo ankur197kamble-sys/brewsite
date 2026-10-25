@@ -1,22 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { STATUS_LABEL } from "@/app/lib/orders";
-import { useSavedOrders, useTable } from "./storage";
-import { usePublicOrder } from "./use-order";
+import { forgetInstallEvent, useInstallEvent } from "./install";
+import { useHydrated, useSavedOrders, useTable } from "./storage";
+import { usePublicOrder, type OrderState } from "./use-order";
 
-/** The order card: a live order in progress, else how to start ordering. */
+function activeOrder(state: OrderState) {
+  return state.kind === "ready" && state.order.status !== "completed" && state.order.status !== "cancelled"
+    ? state.order
+    : null;
+}
+
+/**
+ * The order card: an order in progress, else how to start ordering. The
+ * three newest orders are checked, because a quick coffee ordered after a
+ * meal can finish first while the meal is still being made.
+ */
 export function OrderStart({ hasMenu }: { hasMenu: boolean }) {
+  const hydrated = useHydrated();
   const table = useTable();
-  const latest = useSavedOrders()[0] ?? null;
-  const latestState = usePublicOrder(latest?.token ?? null);
-  const live =
-    latestState.kind === "ready" &&
-    latestState.order.status !== "completed" &&
-    latestState.order.status !== "cancelled"
-      ? latestState.order
-      : null;
+  const saved = useSavedOrders();
+  const first = usePublicOrder(saved[0]?.token ?? null);
+  const second = usePublicOrder(saved[1]?.token ?? null);
+  const third = usePublicOrder(saved[2]?.token ?? null);
+  const live = activeOrder(first) ?? activeOrder(second) ?? activeOrder(third);
+  // Until the saved orders have answered, an order in progress may be among
+  // them: wait rather than show "Start your order" and then swap it out.
+  const checking = [first, second, third].some((state) => state.kind === "loading");
+
+  if (!hydrated || (!live && checking)) {
+    return <div aria-busy="true" className="app-skeleton h-40 w-full rounded-[var(--app-radius)]" />;
+  }
 
   if (live) {
     return (
@@ -64,8 +80,6 @@ export function OrderStart({ hasMenu }: { hasMenu: boolean }) {
   );
 }
 
-type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
-
 function subscribeStandalone(callback: () => void) {
   const query = window.matchMedia("(display-mode: standalone)");
   query.addEventListener("change", callback);
@@ -90,16 +104,8 @@ const isIos = () => /iPhone|iPad|iPod/.test(navigator.userAgent);
 export function InstallPrompt({ name }: { name: string }) {
   const installed = useSyncExternalStore(subscribeStandalone, isStandalone, () => true);
   const ios = useSyncExternalStore(noSubscribe, isIos, () => false);
-  const [installEvent, setInstallEvent] = useState<InstallEvent | null>(null);
-
-  useEffect(() => {
-    const onPrompt = (event: Event) => {
-      event.preventDefault();
-      setInstallEvent(event as InstallEvent);
-    };
-    window.addEventListener("beforeinstallprompt", onPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
-  }, []);
+  // Caught by ./install from the first page the customer opened.
+  const installEvent = useInstallEvent();
 
   if (installed || (!installEvent && !ios)) return null;
 
@@ -117,7 +123,7 @@ export function InstallPrompt({ name }: { name: string }) {
             onClick={async () => {
               await installEvent.prompt();
               await installEvent.userChoice.catch(() => null);
-              setInstallEvent(null);
+              forgetInstallEvent();
             }}
           >
             Install app

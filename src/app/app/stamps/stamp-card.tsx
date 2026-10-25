@@ -1,9 +1,104 @@
 "use client";
 
 import Link from "next/link";
-import { STAMPS_PER_REWARD, stampsOnCard } from "@/app/lib/orders";
-import { useSavedOrders } from "../storage";
-import { usePublicOrder } from "../use-order";
+import { useEffect, useState } from "react";
+import { STAMPS_PER_REWARD, stampsOnCard, type PublicOrderView } from "@/app/lib/orders";
+import { useHydrated, useSavedOrders } from "../storage";
+
+/** How many of this phone's loyalty orders are searched for the card. */
+const LOOKBACK = 6;
+const RETRY_MS = 6000;
+/** While a stamp is on its way, check again now and then. */
+const PENDING_POLL_MS = 15000;
+
+type Card = { stamps: number; rewardsAvailable: number };
+
+type CardLookup =
+  | { kind: "loading" }
+  | { kind: "offline" }
+  /** `pending`: numbers of orders still in progress that will earn a stamp. */
+  | { kind: "none"; pending: number[] }
+  | { kind: "card"; phone: string; card: Card; pending: number[] };
+
+/**
+ * Finds the stamp card through this phone's own orders, newest first: the
+ * card shows on the first collected one. Every order still in progress
+ * (newer or older, with the same number) is listed as a stamp on its way,
+ * and re-checked now and then while the screen is visible. A failed check
+ * keeps whatever is already on screen.
+ */
+function useLoyaltyCard(tokens: string[]): CardLookup {
+  const key = tokens.slice(0, LOOKBACK).join(",");
+  const [result, setResult] = useState<{ key: string; lookup: CardLookup } | null>(null);
+
+  useEffect(() => {
+    if (!key) return;
+    const list = key.split(",");
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let again = false;
+
+    async function search() {
+      clearTimeout(timer);
+      const orders: PublicOrderView[] = [];
+      try {
+        for (const token of list) {
+          const response = await fetch(`/api/public/orders/${encodeURIComponent(token)}`, { cache: "no-store" });
+          // One unreadable order should not hide the card found through the others.
+          if (!response.ok) continue;
+          orders.push(((await response.json()) as { data: PublicOrderView }).data);
+        }
+      } catch {
+        // Offline: keep what is on screen, and try again shortly.
+        if (cancelled) return;
+        setResult((previous) =>
+          previous?.key === key && previous.lookup.kind !== "loading" && previous.lookup.kind !== "offline"
+            ? previous
+            : { key, lookup: { kind: "offline" } },
+        );
+        again = true;
+        timer = setTimeout(tick, RETRY_MS);
+        return;
+      }
+      if (cancelled) return;
+
+      const withCard = orders.find((order) => order.loyalty?.card);
+      const inProgress = orders.filter(
+        (order) => order.loyalty && !order.loyalty.card && order.status !== "cancelled" && order.status !== "completed",
+      );
+      let lookup: CardLookup;
+      if (withCard?.loyalty?.card) {
+        const phone = withCard.loyalty.phone;
+        const pending = inProgress.filter((order) => order.loyalty?.phone === phone).map((order) => order.number);
+        lookup = { kind: "card", phone, card: withCard.loyalty.card, pending };
+      } else {
+        lookup = { kind: "none", pending: inProgress.map((order) => order.number) };
+      }
+      setResult({ key, lookup });
+      again = lookup.pending.length > 0;
+      if (again) timer = setTimeout(tick, PENDING_POLL_MS);
+    }
+
+    function tick() {
+      if (document.visibilityState === "visible") search();
+    }
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && again) search();
+    };
+
+    search();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [key]);
+
+  if (!key) return { kind: "none", pending: [] };
+  return result?.key === key ? result.lookup : { kind: "loading" };
+}
 
 function CupIcon({ filled }: { filled: boolean }) {
   return (
@@ -13,20 +108,45 @@ function CupIcon({ filled }: { filled: boolean }) {
   );
 }
 
+function Loading({ offline }: { offline: boolean }) {
+  return (
+    <main className="app-screen" aria-busy="true">
+      <div className="app-skeleton h-10 w-56" />
+      <div className="app-skeleton mt-6 h-64 w-full" />
+      {offline && (
+        <p role="status" className="app-muted mt-6 text-sm">
+          No connection. We&apos;ll keep trying.
+        </p>
+      )}
+    </main>
+  );
+}
+
 /**
- * The loyalty card, read through the customer's most recent order that was
- * placed with a loyalty number (stamps are looked up by that private order
- * link, so no one can check stamps by typing someone else's number).
+ * The loyalty card, read through this phone's own order links. The card is
+ * only shown through an order that was collected and paid at the counter
+ * (see PublicOrderView), so typing someone else's number into an order
+ * reveals nothing.
  */
 export function StampCard() {
-  const withLoyalty = useSavedOrders().find((order) => order.loyalty) ?? null;
-  const state = usePublicOrder(withLoyalty?.token ?? null, { live: false });
-  const loyalty = state.kind === "ready" ? state.order.loyalty : null;
+  const hydrated = useHydrated();
+  const tokens = useSavedOrders()
+    .filter((order) => order.loyalty)
+    .map((order) => order.token);
+  const lookup = useLoyaltyCard(tokens);
 
-  if (!withLoyalty || state.kind === "missing" || (state.kind === "ready" && !loyalty)) {
+  if (!hydrated || lookup.kind === "loading") return <Loading offline={false} />;
+  if (lookup.kind === "offline") return <Loading offline />;
+
+  const loyalty = lookup.kind === "card" ? lookup : null;
+  const card = loyalty?.card ?? null;
+  const pending = lookup.pending;
+
+  if (!loyalty || !card) {
     return (
       <main className="app-screen">
         <h1 className="app-title">Loyalty stamps</h1>
+        <PendingStamps numbers={pending} />
         <div className="app-card-dark mt-6 p-6">
           <p className="app-heading">
             Collect {STAMPS_PER_REWARD} stamps, get a treat on us
@@ -51,21 +171,13 @@ export function StampCard() {
     );
   }
 
-  if (!loyalty) {
-    return (
-      <main className="app-screen" aria-busy="true">
-        <div className="app-skeleton h-10 w-56" />
-        <div className="app-skeleton mt-6 h-64 w-full" />
-      </main>
-    );
-  }
-
-  const filled = stampsOnCard(loyalty.stamps, loyalty.rewardsAvailable);
-  const reward = loyalty.rewardsAvailable > 0;
+  const filled = stampsOnCard(card.stamps, card.rewardsAvailable);
+  const reward = card.rewardsAvailable > 0;
 
   return (
     <main className="app-screen">
       <h1 className="app-title">Loyalty stamps</h1>
+      <PendingStamps numbers={pending} />
 
       <section className="app-card-dark mt-6 overflow-hidden p-6" aria-labelledby="card-heading">
         <p className="text-[0.7rem] font-semibold tracking-[0.18em] text-[var(--accent-soft)] uppercase">
@@ -73,7 +185,7 @@ export function StampCard() {
         </p>
         <h2 id="card-heading" className="app-heading mt-2 text-[1.6rem]">
           {reward
-            ? `${loyalty.rewardsAvailable} treat${loyalty.rewardsAvailable === 1 ? "" : "s"} ready!`
+            ? `${card.rewardsAvailable} treat${card.rewardsAvailable === 1 ? "" : "s"} ready!`
             : `${STAMPS_PER_REWARD - filled} more to your next treat`}
         </h2>
 
@@ -106,9 +218,22 @@ export function StampCard() {
       </section>
 
       <p className="app-muted mt-4 text-sm leading-6">
-        {loyalty.stamps} stamp{loyalty.stamps === 1 ? "" : "s"} collected in total. Stamps are kept by the café
+        {card.stamps} stamp{card.stamps === 1 ? "" : "s"} collected in total. Stamps are kept by the café
         against your number.
       </p>
     </main>
+  );
+}
+
+function PendingStamps({ numbers }: { numbers: number[] }) {
+  if (numbers.length === 0) return null;
+  const list = numbers.map((number) => `#${number}`).join(", ");
+  return (
+    <p className="app-card mt-6 px-5 py-4 text-[0.95rem] leading-6">
+      <strong className="font-semibold">{numbers.length === 1 ? "A stamp is on its way." : `${numbers.length} stamps are on their way.`}</strong>{" "}
+      <span className="app-muted">
+        You&apos;ll get {numbers.length === 1 ? "it" : "them"} when you collect order {list} at the counter.
+      </span>
+    </p>
   );
 }

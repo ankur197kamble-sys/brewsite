@@ -172,20 +172,26 @@ export function TablesManager({ tables, origin }: { tables: TableView[]; origin:
                         maxLength={40}
                         value={renaming.value}
                         onChange={(event) => setRenaming({ id: table.id, value: event.target.value })}
-                        className="min-w-0 flex-1 rounded-lg border border-black/20 px-3 py-1.5"
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape") setRenaming(null);
+                        }}
+                        className="min-h-11 min-w-0 flex-1 rounded-lg border border-black/20 px-3"
                       />
-                      <button type="submit" disabled={working} className="text-sm font-semibold">
+                      <button type="submit" disabled={working} className="min-h-11 px-2 text-sm font-semibold">
                         Save
+                      </button>
+                      <button type="button" onClick={() => setRenaming(null)} className="min-h-11 px-2 text-sm text-black/60">
+                        Cancel
                       </button>
                     </form>
                   ) : (
                     <p className="text-lg font-semibold">{table.label}</p>
                   )}
-                  <p className={`mt-0.5 text-xs font-medium ${table.isActive ? "text-green-800" : "text-black/50"}`}>
+                  <p className={`mt-0.5 text-xs font-medium ${table.isActive ? "text-green-800" : "text-black/60"}`}>
                     {table.isActive ? "Taking orders" : "Switched off: QR code does nothing"}
                   </p>
                   <div className="mt-auto flex flex-wrap gap-2 pt-3">
-                    <button type="button" disabled={working} onClick={() => setRenaming({ id: table.id, value: table.label })} className={ghostButton}>
+                    <button type="button" disabled={working} onClick={() => setRenaming({ id: table.id, value: table.label })} className={ghostButton} aria-label={`Rename ${table.label}`}>
                       Rename
                     </button>
                     <button
@@ -193,16 +199,23 @@ export function TablesManager({ tables, origin }: { tables: TableView[]; origin:
                       disabled={working}
                       onClick={() => request(`/api/tables/${table.id}`, "PATCH", { isActive: !table.isActive })}
                       className={ghostButton}
+                      aria-label={`${table.isActive ? "Switch off" : "Switch on"} ${table.label}`}
                     >
                       {table.isActive ? "Switch off" : "Switch on"}
                     </button>
-                    <a href={url} target="_blank" rel="noreferrer" className={`${ghostButton} inline-flex items-center`}>
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`${ghostButton} inline-flex items-center`}
+                      aria-label={`Test ${table.label} (opens in a new tab)`}
+                    >
                       Test
                     </a>
-                    <button type="button" disabled={working} onClick={() => setPending({ kind: "renew", table })} className={ghostButton}>
+                    <button type="button" disabled={working} onClick={() => setPending({ kind: "renew", table })} className={ghostButton} aria-label={`New QR code for ${table.label}`}>
                       New QR
                     </button>
-                    <button type="button" disabled={working} onClick={() => setPending({ kind: "delete", table })} className={ghostButton}>
+                    <button type="button" disabled={working} onClick={() => setPending({ kind: "delete", table })} className={ghostButton} aria-label={`Delete ${table.label}`}>
                       Delete
                     </button>
                   </div>

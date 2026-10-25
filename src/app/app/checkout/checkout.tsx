@@ -2,11 +2,24 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { formatPaise, MAX_ITEM_QUANTITY, normalizeIndianMobile, STAMPS_PER_REWARD } from "@/app/lib/orders";
 import type { AppMenuSection } from "../data";
 import { cartSummary } from "../cart";
-import { rememberOrder, saveCart, saveCustomer, useCart, useCustomer, useTable, type Cart } from "../storage";
+import {
+  clearCheckoutKey,
+  deviceId,
+  pendingCheckoutKey,
+  pruneCart,
+  rememberOrder,
+  saveCart,
+  saveCustomer,
+  useCart,
+  useCustomer,
+  useHydrated,
+  useTable,
+  type Cart,
+} from "../storage";
 
 const fieldClass = "app-field";
 
@@ -16,9 +29,17 @@ function messageFrom(payload: unknown): string | null {
   return typeof message === "string" ? message : null;
 }
 
+/** An earlier attempt of this checkout that went through ({ token, number }), from a 409. */
+function earlierOrderFrom(payload: unknown): { token: string; number: number } | null {
+  if (typeof payload !== "object" || payload === null) return null;
+  const { data } = payload as { data?: { token?: unknown; number?: unknown } };
+  return typeof data?.token === "string" && typeof data.number === "number" ? { token: data.token, number: data.number } : null;
+}
+
 /** Review the cart, add name (and optionally a number for stamps), place the order. */
 export function Checkout({ menu }: { menu: AppMenuSection[] }) {
   const router = useRouter();
+  const hydrated = useHydrated();
   const table = useTable();
   const cart = useCart();
   const saved = useCustomer();
@@ -31,17 +52,37 @@ export function Checkout({ menu }: { menu: AppMenuSection[] }) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set once the order is in, so the emptied cart never flashes "Nothing added yet".
+  const [placed, setPlaced] = useState(false);
+  const [earlier, setEarlier] = useState<{ token: string; number: number } | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const focusHeading = useRef(false);
 
   const nameValue = name ?? saved.name;
   const phoneValue = phone ?? saved.phone;
   const loyaltyValue = loyalty ?? saved.loyalty;
   const phoneProblem = loyaltyValue && phoneValue.trim() !== "" && !normalizeIndianMobile(phoneValue);
 
+  // Drop dishes that are no longer on the menu (hidden since they were added).
+  useEffect(() => {
+    const pruned = pruneCart(cart, new Set(menu.flatMap((section) => section.items.map((item) => item.id))));
+    if (pruned) saveCart(pruned);
+  }, [cart, menu]);
+
+  // Removing a line removes its buttons too; keep keyboard focus on the page.
+  useEffect(() => {
+    if (!focusHeading.current) return;
+    focusHeading.current = false;
+    headingRef.current?.focus();
+  }, [cart]);
+
   function setQuantity(itemId: number, quantity: number) {
     const next: Cart = { ...cart };
     const clamped = Math.max(0, Math.min(MAX_ITEM_QUANTITY, quantity));
-    if (clamped === 0) delete next[itemId];
-    else next[itemId] = clamped;
+    if (clamped === 0) {
+      delete next[itemId];
+      focusHeading.current = true;
+    } else next[itemId] = clamped;
     saveCart(next);
   }
 
@@ -50,6 +91,7 @@ export function Checkout({ menu }: { menu: AppMenuSection[] }) {
     if (!table || busy) return;
     setBusy(true);
     setError(null);
+    setEarlier(null);
 
     try {
       const response = await fetch("/api/public/orders", {
@@ -62,17 +104,32 @@ export function Checkout({ menu }: { menu: AppMenuSection[] }) {
           loyalty: loyaltyValue,
           customerPhone: loyaltyValue ? phoneValue : undefined,
           note,
+          // Reused by every retry until the order is confirmed: if a response
+          // was lost after the order went through, the retry gets that order
+          // back instead of placing a second one.
+          idempotencyKey: pendingCheckoutKey(table.token),
+          deviceId: deviceId(),
         }),
       });
       const payload: unknown = await response.json().catch(() => null);
 
       if (!response.ok) {
+        const previous = response.status === 409 ? earlierOrderFrom(payload) : null;
+        if (previous) {
+          // The first try went through before the order was changed. Keep the
+          // cart, show that order, and let a new checkout start fresh.
+          rememberOrder(previous.token, previous.number, true);
+          clearCheckoutKey();
+          setEarlier(previous);
+        }
         setError(messageFrom(payload) ?? "Could not place your order. Please try again.");
         setBusy(false);
         return;
       }
 
       const { token, number } = (payload as { data: { token: string; number: number } }).data;
+      setPlaced(true);
+      clearCheckoutKey();
       rememberOrder(token, number, loyaltyValue);
       saveCustomer({ name: nameValue.trim(), phone: loyaltyValue ? phoneValue.trim() : "", loyalty: loyaltyValue });
       saveCart({});
@@ -81,6 +138,26 @@ export function Checkout({ menu }: { menu: AppMenuSection[] }) {
       setError("No connection. Check your internet and try again.");
       setBusy(false);
     }
+  }
+
+  if (placed) {
+    return (
+      <main className="app-screen" aria-busy="true">
+        <p role="status" className="app-heading">
+          Order placed. Opening it…
+        </p>
+      </main>
+    );
+  }
+
+  if (!hydrated) {
+    return (
+      <main className="app-screen" aria-busy="true">
+        <div className="app-skeleton h-10 w-48" />
+        <div className="app-skeleton mt-6 h-40 w-full" />
+        <div className="app-skeleton mt-6 h-64 w-full" />
+      </main>
+    );
   }
 
   if (!table) {
@@ -100,7 +177,9 @@ export function Checkout({ menu }: { menu: AppMenuSection[] }) {
   if (summary.count === 0) {
     return (
       <main className="app-screen">
-        <h1 className="app-title">Your order</h1>
+        <h1 ref={headingRef} tabIndex={-1} className="app-title outline-none">
+          Your order
+        </h1>
         <p className="app-muted mt-4">Nothing added yet.</p>
         <Link href="/app/menu" className="app-btn app-btn-primary mt-6">
           Browse the menu
@@ -114,7 +193,9 @@ export function Checkout({ menu }: { menu: AppMenuSection[] }) {
       <Link href="/app/menu" className="app-muted inline-flex min-h-11 items-center text-sm font-medium">
         ← Back to menu
       </Link>
-      <h1 className="app-title mt-1">Your order</h1>
+      <h1 ref={headingRef} tabIndex={-1} className="app-title mt-1 outline-none">
+        Your order
+      </h1>
       <p className="app-muted mt-2">{table.label} · pay at the counter</p>
 
       <ul className="app-card mt-6 divide-y divide-[var(--line)] px-4">
@@ -148,9 +229,14 @@ export function Checkout({ menu }: { menu: AppMenuSection[] }) {
 
       <form onSubmit={placeOrder} className="mt-6 space-y-5 pb-6">
         {error && (
-          <p role="alert" className="rounded-xl border border-red-900/20 bg-red-50 px-4 py-3 text-sm text-red-900">
-            {error}
-          </p>
+          <div role="alert" className="rounded-xl border border-red-900/20 bg-red-50 px-4 py-3 text-sm text-red-900">
+            <p>{error}</p>
+            {earlier && (
+              <Link href={`/app/orders/${earlier.token}`} className="mt-2 inline-flex min-h-11 items-center font-semibold underline underline-offset-4">
+                View order #{earlier.number}
+              </Link>
+            )}
+          </div>
         )}
 
         <div>

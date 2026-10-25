@@ -29,7 +29,7 @@ export default async function AppHome() {
           src={cafe.heroImage}
           alt=""
           fill
-          priority
+          preload
           sizes="(max-width: 448px) 100vw, 448px"
           className="-z-20 object-cover"
         />

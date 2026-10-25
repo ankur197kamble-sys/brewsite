@@ -106,6 +106,11 @@ export const MAX_ORDER_LINES = 30;
 export const MAX_ITEM_QUANTITY = 20;
 const MAX_NAME_LENGTH = 40;
 const MAX_NOTE_LENGTH = 200;
+/** ₹10,00,000: far above any real café order, and safely inside 32-bit paise columns. */
+export const MAX_ORDER_TOTAL_PAISE = 100_000_000;
+
+/** A random id the phone makes itself (crypto.randomUUID), never personal data. */
+const CLIENT_KEY = /^[A-Za-z0-9-]{16,64}$/;
 
 export type OrderLineInput = { menuItemId: number; quantity: number };
 
@@ -116,7 +121,16 @@ export type OrderInput = {
   /** Normalized mobile, only when the customer opted in to loyalty stamps. */
   customerPhone: string | null;
   note: string | null;
+  /** Same for every retry of one checkout, so a retry never orders twice. */
+  idempotencyKey: string | null;
+  /** The app's id for this phone, used only to rate-limit one device. Always sent by the app. */
+  deviceId: string;
 };
+
+function optionalClientKey(value: unknown): string | null | undefined {
+  if (value === undefined || value === null) return null;
+  return typeof value === "string" && CLIENT_KEY.test(value) ? value : undefined;
+}
 
 /**
  * Validates a customer's order. Only ids and quantities are accepted from
@@ -170,6 +184,10 @@ export function validateOrderInput(body: unknown): Validated<OrderInput> {
     if (note && note.length > MAX_NOTE_LENGTH) return invalid(`Note must be under ${MAX_NOTE_LENGTH} characters`);
   }
 
+  const idempotencyKey = optionalClientKey(record.idempotencyKey);
+  const deviceId = optionalClientKey(record.deviceId);
+  if (idempotencyKey === undefined || !deviceId) return invalid("Invalid order. Please refresh the page and try again.");
+
   return {
     ok: true,
     value: {
@@ -178,6 +196,8 @@ export function validateOrderInput(body: unknown): Validated<OrderInput> {
       customerName: name,
       customerPhone,
       note,
+      idempotencyKey,
+      deviceId,
     },
   };
 }
@@ -190,7 +210,14 @@ export type OrderLineView = {
   unitPricePaise: number;
 };
 
-/** What the customer's phone may see about its own order. */
+/**
+ * What the customer's phone may see about its own order.
+ *
+ * Loyalty numbers are not verified (no OTP yet), so the card's stamps are
+ * shown only once this order has been collected and paid at the counter.
+ * Typing someone else's number into an order therefore reveals nothing
+ * about their card without visiting and paying in person.
+ */
 export type PublicOrderView = {
   token: string;
   number: number;
@@ -200,7 +227,11 @@ export type PublicOrderView = {
   totalPaise: number;
   createdAt: string;
   lines: OrderLineView[];
-  loyalty: { phone: string; stamps: number; rewardsAvailable: number } | null;
+  loyalty: {
+    /** Last four digits only. */
+    phone: string;
+    card: { stamps: number; rewardsAvailable: number } | null;
+  } | null;
 };
 
 /** What staff see on the orders screen. */
@@ -217,6 +248,9 @@ export type StaffOrderView = {
   lines: OrderLineView[];
 };
 
+/** Today's orders, and those collected and paid, in the café's own day. */
+export type TodayTotals = { orders: number; collected: number; collectedPaise: number };
+
 export type TableView = {
   id: number;
   label: string;
@@ -230,11 +264,6 @@ export type LoyaltyView = {
   rewardsRedeemed: number;
   rewardsAvailable: number;
 };
-
-/** Short order number shown to staff and customer ("#1042"). */
-export function orderNumber(id: number): number {
-  return 1000 + id;
-}
 
 const LABEL_MAX = 40;
 

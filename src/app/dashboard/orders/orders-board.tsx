@@ -4,9 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { formatPaise, maskPhone, type OrderStatus, type StaffOrderView } from "@/app/lib/orders";
+import { CAFE_TIME_ZONE } from "@/app/lib/cafe-time";
+import type { TodayTotals } from "@/app/lib/orders";
 import { ConfirmDialog } from "../confirm-dialog";
 
 const POLL_MS = 4000;
+/**
+ * While the tab is hidden (staff are in another tab or app) the board keeps
+ * checking, a little less often, so new orders still chime. Browsers may
+ * slow hidden tabs further after a few minutes.
+ */
+const HIDDEN_POLL_MS = 10000;
 const SOUND_KEY = "brewsite.orderSound";
 
 const COLUMNS: { status: OrderStatus; title: string; empty: string }[] = [
@@ -25,7 +33,7 @@ function minutesAgo(iso: string, now: number): string {
   const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));
   if (minutes < 1) return "just now";
   if (minutes < 60) return `${minutes} min ago`;
-  return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", timeZone: CAFE_TIME_ZONE });
 }
 
 /** A short two-tone chime, made in the browser (no audio file to load). */
@@ -57,15 +65,27 @@ function readSoundPreference() {
 const subscribeNothing = () => () => {};
 
 /**
- * The counter screen. Polls for orders every few seconds (pausing while the
- * tab is hidden), chimes on new ones once sound has been switched on, and
- * moves each order along with one large button.
+ * The counter screen. Polls for orders every few seconds (less often while
+ * the tab is hidden), chimes on new ones once sound has been switched on,
+ * and moves each order along with one large button.
+ *
+ * `renderedAt` is the server's clock when the page was made, so "x min ago"
+ * reads the same in the server render and the first browser render.
  */
-export function OrdersBoard({ initialOrders }: { initialOrders: StaffOrderView[] }) {
+export function OrdersBoard({
+  initialOrders,
+  initialToday,
+  renderedAt,
+}: {
+  initialOrders: StaffOrderView[];
+  initialToday: TodayTotals;
+  renderedAt: number;
+}) {
   const router = useRouter();
   const [orders, setOrders] = useState(initialOrders);
+  const [today, setToday] = useState(initialToday);
   const [connected, setConnected] = useState(true);
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(renderedAt);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<OrderStatus>("received");
@@ -80,8 +100,12 @@ export function OrdersBoard({ initialOrders }: { initialOrders: StaffOrderView[]
   // Read by the polling loop, which must see the latest choice without restarting.
   const chimeEnabled = useRef(false);
   const seen = useRef(new Set(initialOrders.map((order) => order.id)));
+  // Bumped by every staff action: a poll that started before the action
+  // carries older data, and must not undo what staff just did on screen.
+  const generation = useRef(0);
 
   const refresh = useCallback(async () => {
+    const startedAt = generation.current;
     try {
       const response = await fetch("/api/orders", { cache: "no-store" });
       if (response.status === 401) {
@@ -89,11 +113,13 @@ export function OrdersBoard({ initialOrders }: { initialOrders: StaffOrderView[]
         return;
       }
       if (!response.ok) throw new Error(String(response.status));
-      const next = ((await response.json()) as { data: { orders: StaffOrderView[] } }).data.orders;
-      const fresh = next.filter((order) => order.status === "received" && !seen.current.has(order.id));
-      next.forEach((order) => seen.current.add(order.id));
+      const data = ((await response.json()) as { data: { orders: StaffOrderView[]; today: TodayTotals } }).data;
+      if (startedAt !== generation.current) return;
+      const fresh = data.orders.filter((order) => order.status === "received" && !seen.current.has(order.id));
+      data.orders.forEach((order) => seen.current.add(order.id));
       if (fresh.length > 0 && chimeEnabled.current && audio.current) chime(audio.current);
-      setOrders(next);
+      setOrders(data.orders);
+      setToday(data.today);
       setConnected(true);
     } catch {
       setConnected(false);
@@ -103,13 +129,12 @@ export function OrdersBoard({ initialOrders }: { initialOrders: StaffOrderView[]
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     const loop = async () => {
-      if (document.visibilityState === "visible") {
-        await refresh();
-        setNow(Date.now());
-      }
-      timer = setTimeout(loop, POLL_MS);
+      await refresh();
+      setNow(Date.now());
+      timer = setTimeout(loop, document.visibilityState === "visible" ? POLL_MS : HIDDEN_POLL_MS);
     };
-    timer = setTimeout(loop, POLL_MS);
+    // A page restored from the browser's cache can be old: refresh at once.
+    timer = setTimeout(loop, Date.now() - renderedAt > 5000 ? 0 : POLL_MS);
     const onVisible = () => {
       if (document.visibilityState === "visible") refresh();
     };
@@ -118,7 +143,7 @@ export function OrdersBoard({ initialOrders }: { initialOrders: StaffOrderView[]
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [refresh]);
+  }, [refresh, renderedAt]);
 
   const byStatus = useMemo(() => {
     const groups = new Map<OrderStatus, StaffOrderView[]>();
@@ -129,12 +154,6 @@ export function OrdersBoard({ initialOrders }: { initialOrders: StaffOrderView[]
   }, [orders]);
 
   const newCount = byStatus.get("received")?.length ?? 0;
-  const today = useMemo(() => {
-    const start = new Date(now);
-    start.setHours(0, 0, 0, 0);
-    const done = orders.filter((order) => order.status === "completed" && new Date(order.createdAt) >= start);
-    return { count: done.length, totalPaise: done.reduce((sum, order) => sum + order.totalPaise, 0) };
-  }, [orders, now]);
 
   useEffect(() => {
     document.title = newCount > 0 ? `(${newCount}) New orders · BrewSite` : "Orders · BrewSite Dashboard";
@@ -166,6 +185,7 @@ export function OrdersBoard({ initialOrders }: { initialOrders: StaffOrderView[]
   }, [soundOn, audioReady]);
 
   async function move(order: StaffOrderView, to: OrderStatus) {
+    generation.current += 1;
     setBusyId(order.id);
     setError(null);
     try {
@@ -175,6 +195,8 @@ export function OrdersBoard({ initialOrders }: { initialOrders: StaffOrderView[]
         body: JSON.stringify({ status: to }),
       });
       const payload: { message?: string } | null = await response.json().catch(() => null);
+      // Polls that started while the change was being saved are out of date too.
+      generation.current += 1;
       if (!response.ok) setError(payload?.message ?? "Could not update the order");
       else setOrders((current) => current.map((o) => (o.id === order.id ? { ...o, status: to } : o)));
       await refresh();
@@ -206,7 +228,7 @@ export function OrdersBoard({ initialOrders }: { initialOrders: StaffOrderView[]
           <div className="rounded-2xl border border-black/10 bg-white/60 px-4 py-2 text-sm">
             <span className="text-black/55">Collected today</span>{" "}
             <strong className="tabular-nums">
-              {today.count} · {formatPaise(today.totalPaise)}
+              {today.collected} · {formatPaise(today.collectedPaise)}
             </strong>
           </div>
           <button
@@ -228,16 +250,15 @@ export function OrdersBoard({ initialOrders }: { initialOrders: StaffOrderView[]
         </p>
       )}
 
-      {/* Phones, tablets and small laptops: one column at a time, chosen with tabs. Wide screens: all three. */}
-      <div role="tablist" aria-label="Order status" className="mt-8 grid grid-cols-3 gap-2 xl:hidden">
+      {/* Phones, tablets and small laptops: one column at a time, chosen with these buttons. Wide screens: all three. */}
+      <div role="group" aria-label="Show orders" className="mt-8 grid grid-cols-3 gap-2 xl:hidden">
         {COLUMNS.map((column) => {
           const count = byStatus.get(column.status)?.length ?? 0;
           return (
             <button
               key={column.status}
               type="button"
-              role="tab"
-              aria-selected={tab === column.status}
+              aria-pressed={tab === column.status}
               onClick={() => setTab(column.status)}
               className={`min-h-12 rounded-xl text-sm font-semibold transition ${
                 tab === column.status ? "bg-[#1f1a17] text-white" : "border border-black/10 bg-white/60"
@@ -263,7 +284,7 @@ export function OrdersBoard({ initialOrders }: { initialOrders: StaffOrderView[]
                 <span className="rounded-full bg-black/5 px-2.5 py-0.5 tabular-nums">{list.length}</span>
               </h2>
               {list.length === 0 ? (
-                <p className="rounded-2xl border border-dashed border-black/15 p-6 text-center text-sm text-black/50">
+                <p className="rounded-2xl border border-dashed border-black/15 p-6 text-center text-sm text-black/60">
                   {column.empty}
                 </p>
               ) : (
@@ -368,8 +389,9 @@ function OrderCard({
       </div>
 
       <ul className="mt-4 space-y-1.5">
-        {order.lines.map((line) => (
-          <li key={line.name} className="flex gap-3 text-[0.95rem]">
+        {order.lines.map((line, index) => (
+          // Lines never reorder, and two dishes can share a name.
+          <li key={index} className="flex gap-3 text-[0.95rem]">
             <span className="min-w-7 font-semibold tabular-nums">{line.quantity}×</span>
             <span>{line.name}</span>
           </li>
@@ -393,6 +415,7 @@ function OrderCard({
             type="button"
             onClick={() => onMove(order, next.to)}
             disabled={busy}
+            aria-label={busy ? undefined : `${next.label}: order #${order.number}`}
             className="min-h-12 flex-1 rounded-xl bg-[#1f1a17] px-4 font-semibold text-white transition hover:opacity-85 active:scale-[0.98] disabled:opacity-50"
           >
             {busy ? "Updating…" : next.label}
@@ -401,6 +424,7 @@ function OrderCard({
             type="button"
             onClick={onCancel}
             disabled={busy}
+            aria-label={`Cancel order #${order.number}`}
             className="min-h-12 rounded-xl border border-black/15 px-4 text-sm font-medium transition hover:bg-black/5 disabled:opacity-50"
           >
             Cancel

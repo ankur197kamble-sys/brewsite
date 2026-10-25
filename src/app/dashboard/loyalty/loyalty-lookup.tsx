@@ -23,6 +23,8 @@ export function LoyaltyLookup() {
     event.preventDefault();
     setBusy(true);
     setError(null);
+    // A failed lookup must never leave the previous customer's card on screen.
+    setCard(null);
     setNotice(null);
     try {
       const response = await fetch(`/api/loyalty?phone=${encodeURIComponent(phone)}`, { cache: "no-store" });
@@ -104,8 +106,14 @@ export function LoyaltyLookup() {
         </p>
       )}
 
+      <p role="status" className="sr-only">
+        {card
+          ? `${maskPhone(card.phone)}: ${card.stamps} stamp${card.stamps === 1 ? "" : "s"}, ${card.rewardsAvailable} treat${card.rewardsAvailable === 1 ? "" : "s"} ready`
+          : ""}
+      </p>
+
       {card && (
-        <section aria-live="polite" className="mt-6 rounded-2xl bg-[#27201c] p-6 text-[#fffaf3]">
+        <section aria-label="Loyalty card" className="mt-6 rounded-2xl bg-[#27201c] p-6 text-[#fffaf3]">
           <p className="text-xs font-semibold tracking-[0.2em] text-[#e8b995] uppercase">{maskPhone(card.phone)}</p>
           <p className="mt-2 text-2xl font-semibold">
             {card.stamps === 0
