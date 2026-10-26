@@ -5,8 +5,12 @@ cafés, each with its own content, dashboard and (eventually) domain.
 
 - **Public site:** story, gallery, menu, offers and visit details, rendered on
   the server from the database, with fallbacks when content is missing.
-- **Café dashboard** (`/dashboard`): café information, menu, gallery and
-  offers, each with create, edit, delete, reorder and publish/unpublish.
+- **Customer app** (`/app`): an installable phone app for ordering at the
+  table. Customers scan a table's QR code, order from the menu, follow the
+  order live and collect loyalty stamps. They pay at the counter.
+- **Café dashboard** (`/dashboard`): live orders, tables and QR codes,
+  loyalty stamps, café information, menu, gallery and offers. Content
+  sections have create, edit, delete, reorder and publish/unpublish.
 - **Multi-tenant by design:** every dashboard action takes the café from the
   signed-in session, never from the request.
 
@@ -68,6 +72,41 @@ Re-running updates items in place and never duplicates them. With
 `"hideMissing": true`, items not in the file are hidden, never deleted. Mark
 any price you could not read with `"published": false` and a `"note"`: it is
 imported hidden, and the owner confirms it in the dashboard.
+
+## Table ordering and the customer app
+
+1. In **Dashboard → Tables & QR**, add each table (for example "Table 1",
+   "Window seat"), then **Print QR codes** and stick each code on its table.
+   - **Switch off** stops a table taking orders without deleting it.
+   - **New QR** replaces a table's code, for example if a photo of it was
+     shared. The old printed code stops working, so reprint it.
+   - **Delete** removes the table but keeps its past orders.
+2. A customer scans the code. The phone remembers the table for 4 hours and
+   opens the menu. They add dishes, enter a name (and, optionally, a mobile
+   number for loyalty stamps) and place the order. Prices always come from
+   the database, never from the phone.
+3. Staff keep **Dashboard → Orders** open on a tablet or laptop. New orders
+   appear within a few seconds, with an optional chime, even while the tab
+   is in the background. Each order moves
+   **New → Preparing → Ready → Collected & paid**, or can be cancelled.
+   The customer's screen follows along, and shows a large collection ticket
+   when the order is ready.
+4. Every collected order with a mobile number earns one stamp. Ten stamps
+   earn a treat. Staff check and redeem treats in **Dashboard → Loyalty**.
+   Numbers are not verified (no OTP yet), so a customer's stamp card is
+   only shown on their phone after an order has been collected and paid.
+
+Order numbers start again at **#1 every day** (café time), so they stay
+short to call out. If a customer's connection drops while ordering, trying
+again never places the order twice.
+
+Spam protection, every 10 minutes: at most 6 orders from one phone, 15 per
+table, and 30 from one internet connection (the café's Wi-Fi counts as one).
+
+The customer app installs from the browser (Android: the in-app **Install**
+button; iPhone: Share → Add to Home Screen). Its name and icon come from the
+café's details. A small service worker only shows an offline page when there
+is no connection. It never caches menus, prices or orders.
 
 ## Backups
 
@@ -181,10 +220,12 @@ before charging a café for the site.
 With `npm run dev` running in another terminal:
 
 ```bash
-npm test               # menu, offers and uploads end-to-end suites
+npm test               # café, menu, offers, uploads and orders end-to-end suites
+npm run test:cafe
 npm run test:menu
 npm run test:offers
 npm run test:uploads
+npm run test:orders    # tables, ordering, staff updates, loyalty, rate limits
 ```
 
 The suites call the real HTTP API as two throwaway `[test]` cafés, including
@@ -203,8 +244,11 @@ npx next build
 
 ```
 src/app/page.tsx          public homepage
+src/app/app/              customer ordering app (menu, checkout, order status, stamps)
+src/app/t/[token]/        where a table's QR code points
 src/app/dashboard/        café dashboard
-src/app/api/              API routes (auth, cafe, menu, gallery, offers, uploads)
+src/app/api/              API routes (auth, cafe, menu, gallery, offers, uploads,
+                          tables, orders, loyalty; public/ needs no login)
 src/app/db/               schema and tenant-scoped data access
 src/app/lib/              validation, auth, sessions, image-host allowlist
 scripts/                  admin scripts and test suites

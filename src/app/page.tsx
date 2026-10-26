@@ -1,6 +1,7 @@
 import { cache, type CSSProperties } from "react";
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import { Parallax } from "@/app/components/parallax";
 import { Reveal } from "@/app/components/reveal";
 import { SectionIntro } from "@/app/components/section-intro";
@@ -137,7 +138,7 @@ export default async function Home() {
               alt={`Inside ${siteCafe.name}`}
               className="object-cover"
               fill
-              priority
+              preload
               sizes="100vw"
             />
           </div>
@@ -151,13 +152,17 @@ export default async function Home() {
 
         <header className="shell flex items-center justify-between pt-7 lg:pt-10">
           <SiteMark name={siteCafe.name} className="hero-enter" />
-          <a
-            href="#menu"
-            className="button-secondary hero-enter border-white/55 text-white hover:border-white"
-            style={enterAfter(80)}
-          >
-            Menu
-          </a>
+          <div className="hero-enter flex gap-2" style={enterAfter(80)}>
+            <a
+              href="#menu"
+              className="button-secondary border-white/55 text-white hover:border-white"
+            >
+              Menu
+            </a>
+            <Link href="/app" className="button-primary button-light">
+              Order
+            </Link>
+          </div>
         </header>
 
         <div className="shell pb-14 lg:pb-20">

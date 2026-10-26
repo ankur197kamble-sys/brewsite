@@ -31,7 +31,17 @@ export const TABLES = [
   "gallery_images",
   "offers",
   "uploads",
+  "cafe_tables",
+  "orders",
+  "order_items",
+  "loyalty_cards",
 ];
+
+/**
+ * Tables added after the first backups were taken. A backup without them is
+ * still valid; they are restored as empty.
+ */
+const ADDED_LATER = new Set(["cafe_tables", "orders", "order_items", "loyalty_cards"]);
 
 /** Tables holding one café's content, replaced by `restore --cafe`. */
 export const CAFE_CONTENT_TABLES = ["menu_categories", "menu_items", "gallery_images", "offers"];
@@ -153,6 +163,10 @@ export function validateBackup(backup) {
   if (backup.version !== BACKUP_VERSION) throw new Error(`Unsupported backup version ${backup.version}.`);
   for (const table of TABLES) {
     const entry = backup.tables?.[table];
+    if (!entry && ADDED_LATER.has(table) && backup.tables) {
+      backup.tables[table] = { columns: [], rows: [] };
+      continue;
+    }
     if (!entry || !Array.isArray(entry.rows)) throw new Error(`Backup is missing table "${table}".`);
     for (const row of entry.rows) {
       if (typeof row !== "object" || row === null || Array.isArray(row)) {

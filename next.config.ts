@@ -16,10 +16,21 @@ const nextConfig: NextConfig = {
   },
 
   async headers() {
+    // The service worker must never be cached, or phones keep running an old
+    // version (per the Next.js PWA guide).
+    const serviceWorker = {
+      source: "/sw.js",
+      headers: [
+        { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+        { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+      ],
+    };
     // Preview mode: keep every response (pages and optimised images alike)
     // out of search results. See src/app/lib/site-mode.ts.
-    if (!isPreview) return [];
+    if (!isPreview) return [serviceWorker];
     return [
+      serviceWorker,
       {
         source: "/:path*",
         headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],

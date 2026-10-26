@@ -26,6 +26,9 @@ from the git history and the project handoff, not written up in full.
 | 8 | 2026-09-30 | branch `offers-verification` | Offers verification, repeatable tests, four fixes (below) |
 | 9 | 2026-09-30 | branch `photo-uploads` | Photo uploads to Cloudflare R2 |
 | 10 | 2026-09-30 | branch `coffee-gruham` | First real café: Coffee Gruham onboarded; facts never faked; menu importer |
+| 11 | 2026-09-30 | `57ba87e` | Deploy-ready, with a no-index preview mode |
+| 12 | 2026-10-02 | `c3a807f` | Backup and restore |
+| 13 | 2026-10-24 | branch `customer-app` | Customer ordering app: table QR ordering, live status, loyalty stamps, staff orders board |
 
 ---
 
@@ -660,3 +663,191 @@ finding, confirmed 12 low-severity issues (6 refuted). All were fixed:
 two throwaway cafés and a temporary schema with copied foreign keys and its
 own id counters. Café #1 was verified byte-identical after every step, and
 the live data was verified identical to the first real backup afterwards.
+
+---
+
+## Milestone 13: Customer ordering app
+
+**Why:** renting out a website alone was not persuasive. A café sees more
+value in an app its customers order from, like the big chains have: scan the
+table's QR code, order, watch the order being made, collect stamps. Payment
+stays at the counter for now. Online payment (Razorpay) needs the café's own
+KYC, so it comes after they sign up.
+
+**Built (branch `customer-app`):**
+- **Data** (`src/app/db/schema.ts`, `src/app/db/orders.ts`): four tables.
+  - `cafe_tables`: each table has an unguessable QR token (18 random bytes).
+  - `orders` and `order_items`: each line keeps a copy of the dish's name
+    and price, so the history stays true when the menu changes.
+  - `loyalty_cards`: one per café and mobile number.
+- **Placing an order** (`POST /api/public/orders`) is one SQL statement (a
+  CTE) that inserts the order and its lines together.
+  - Neon's HTTP driver has no interactive transactions, so this is how it
+    stays atomic.
+  - Prices come only from the table's café's published, priced dishes. Any
+    price or total sent by the phone is ignored.
+  - Limits (revised in part 2 below): 6 per phone, 15 per table and 30 per
+    internet connection every 10 minutes. Phones and addresses are stored
+    only as salted hashes.
+- **Staff updates** (`PATCH /api/orders/[id]`):
+  - Orders move forward only: received → preparing → ready → completed.
+    Cancelling is allowed while an order is active.
+  - The status change and the loyalty stamp are one statement, guarded by
+    the expected current status. Two staff pressing "Collected" at the same
+    moment give one 200, one 409, and exactly one stamp.
+- **Customer app** (`/app`, under `src/app/app/`):
+  - Home, menu, checkout, live order status, order history and the stamp
+    card, with a bottom tab bar.
+  - The cart, the remembered table (4 hours) and recent orders live only in
+    the phone's localStorage. They are read through `useSyncExternalStore`,
+    so the server render and the first client render agree.
+  - Order status polls every 4 seconds, pauses while the tab is hidden, and
+    keeps the last good state through network blips.
+  - A large collection ticket ("#7, show this at the counter") appears
+    when the order is ready.
+- **Installable (PWA):**
+  - `manifest.ts` and the `/app-icon/[size]` icons are drawn from the café's
+    name (initials in a copper ring), so every café gets its own app icon.
+  - `public/sw.js` only serves an offline page. It never caches menus,
+    prices or orders, so it cannot show stale data.
+- **Dashboard:**
+  - **Orders**: a live board (New / Preparing / Ready) with an optional
+    chime, "waiting a while" highlighting after 15 minutes, and today's
+    collected total. Below 1280px it switches to tabs, so the cards are never
+    squeezed into narrow columns.
+  - **Tables & QR**: add, rename, switch off, new QR and delete, plus a
+    print sheet of cut-out QR cards.
+  - **Loyalty**: look up a customer by mobile number and redeem treats.
+  - The overview shows today's orders.
+- **Never fake café facts:** if the database cannot be reached, the app
+  shows "Can't reach the café right now" with a retry, never demo content.
+  The manifest and icon refuse to fall back to a demo name. New
+  `error.tsx` boundaries (root, `/app`, `/dashboard`) turn unexpected
+  failures into a friendly retry screen instead of a raw error page.
+- **Tenant safety:**
+  - Staff routes take the café from the session only.
+  - A table QR code only works on the app of the café that owns it.
+  - Public order views mask the phone to its last four digits.
+- **Accessibility:**
+  - New colour tokens make the accent pass WCAG AA: `--app-accent-ink`
+    5.3:1 for text, `--app-accent-fill` 5.4:1 with white text.
+  - Touch targets are 44px or larger, with reduced-motion fallbacks.
+  - Fields use a 16px font so iPhones don't zoom in.
+
+**Tests:** `npm run test:orders`, **68 checks** at first (89 after part 2) on two throwaway cafés. It
+covers:
+- auth on every staff route
+- table CRUD and cross-café attacks
+- every refusal (bad token, hidden or zero-priced dishes, another café's dish)
+- price tampering
+- line merging and phone masking
+- forward-only transitions and the double-complete race
+- loyalty per café, and redeeming
+- QR renewal and switched-off tables
+- rate limits
+- table deletion keeping order history
+
+**Browser QA:**
+- Customer screens were checked at 320px, 375px and 390px, with no
+  horizontal overflow on any screen.
+- A test order was followed live from the staff board: Preparing → Ready
+  (ticket) → Collected. The customer's screen followed each step and the
+  stamp appeared.
+- QA found and fixed:
+  - board columns too narrow on laptops
+  - a print button wrapping
+  - a completed stamp card that drew as empty while a treat was waiting
+  - a database blip showing "this QR code is no longer active"
+
+
+### Milestone 13, part 2: independent reviews and fixes
+
+**Why:** an app customers order from at a busy counter must not lose,
+duplicate or misreport orders, and must behave on bad café Wi-Fi.
+
+**How it was checked:** three review rounds. In each, independent reviewers
+looked for defects and a separate skeptic tried to refute every finding;
+only confirmed ones were fixed.
+- Round 1 (the whole app): 34 confirmed, 6 rejected.
+- Round 2 (the round-1 fixes): 13 confirmed, 2 rejected.
+- Round 3 (the round-2 fixes): 4 confirmed, 3 rejected.
+
+**Ordering engine (`placeOrder` in `src/app/db/orders.ts`):**
+- The limit checks, retry check, order number and insert now run in one
+  transaction (`db.batch`) behind a per-café advisory lock. Before, a burst
+  of parallel requests could all pass the limit check.
+- Limits every 10 minutes: 6 per phone (a random app id), 15 per table, 30
+  per internet connection. The old 6-per-IP limit would have blocked a full
+  café on one Wi-Fi.
+- **Safe retries:** each checkout sends an idempotency key, kept on the phone
+  for 30 minutes and tied to the table. A retry after a lost response gets
+  the original order back, even if the dish sold out or the table was
+  switched off in between. If the cart was changed before retrying, the app
+  says the first order went through and links to it (409), instead of
+  silently dropping the change or ordering twice.
+- **Daily order numbers** per café (#1, #2, … from midnight, café time).
+  Short to call out, and they reveal nothing about other cafés.
+- Absurd totals are refused (they would overflow the 32-bit paise columns).
+
+**Database change:**
+- `orders` gained `order_number` (not null), `idempotency_key` and
+  `device_hash`, plus two indexes.
+- Applied with `npm run db:push` after a backup, with the owner's approval,
+  while the table was empty.
+
+**Privacy:** loyalty numbers are not verified (no OTP yet), so a customer's
+stamp totals appear on their phone only after an order is collected and paid
+at the counter. Typing someone else's number into an order reveals nothing
+about their card.
+
+**Staff screens:**
+- The orders board keeps checking (every 10 s) while its tab is in the
+  background, so the chime still works.
+- A slow refresh can no longer undo a button staff just pressed.
+- "Collected today" is counted in the database for the café's whole day.
+- The 409 message names the order's real status after a clash between two
+  staff.
+- Board tabs became a plain toggle group; per-card buttons name their order
+  or table.
+- On the tables and print pages, a warning appears when the dashboard is
+  open on a local address, whose QR codes phones could not open.
+
+**Customer app:**
+- A failed check shows "No connection, retrying" instead of pretending to
+  be live.
+- Storage falls back to memory when the browser blocks it.
+- Hidden dishes are dropped from the cart.
+- The Install button works for customers who arrive by QR code.
+- Keyboard focus follows "Add" into the − / + stepper and back.
+- The menu's category highlight follows the scroll position, including the
+  last category.
+- The stamp card searches several recent orders.
+- Screens wait for the phone's saved data instead of flashing a wrong empty
+  state.
+- The service worker now only handles customer pages.
+- Contrast fixes on the offline page and dashboard text; next/image
+  `priority` replaced by `preload` (deprecated in Next 16).
+
+**Backups:** `restore --cafe` now keeps past order lines linked to their
+dishes. The backup test seeds a table, an order and a loyalty card of its
+own.
+
+**Tests:**
+- `test:orders`: 89 checks. New ones cover retries (sequential, five at
+  once, changed contents, table switched off), daily numbering per café,
+  limits (including 25 orders at once on one table) and loyalty privacy.
+- `test:backup`: 68 checks.
+- All five app suites: 258 checks.
+- TypeScript, ESLint and `next build` are clean.
+- Browser QA at 320–390 px: placing an order, the live status and
+  collection ticket, collection and stamp, keyboard focus, and no
+  horizontal overflow. The QA table, order and loyalty card on café #1 were
+  removed afterwards.
+
+**Known limitations:**
+- A script can rotate the phone id, so the table and network limits are
+  the real ceiling.
+- Loyalty needs OTP before staff can trust a number for redeeming treats.
+- Backups taken before this change that contain orders cannot restore
+  those orders. Only QA orders existed then, and they were deleted.
+- Payment stays at the counter until the café signs up for Razorpay.

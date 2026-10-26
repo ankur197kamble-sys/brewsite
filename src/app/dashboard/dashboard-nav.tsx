@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+/** Day-to-day running first (orders), then content, then setup. */
 const sections = [
   { href: "/dashboard", label: "Overview" },
-  { href: "/dashboard/cafe", label: "Café Information" },
+  { href: "/dashboard/orders", label: "Orders" },
+  { href: "/dashboard/tables", label: "Tables & QR" },
   { href: "/dashboard/menu", label: "Menu" },
-  { href: "/dashboard/gallery", label: "Gallery" },
   { href: "/dashboard/offers", label: "Offers" },
+  { href: "/dashboard/loyalty", label: "Loyalty" },
+  { href: "/dashboard/gallery", label: "Gallery" },
+  { href: "/dashboard/cafe", label: "Café Information" },
 ];
-
-/** Planned sections — shown so the shape of the product is visible. */
-const upcoming = ["Opening Hours", "Analytics", "Settings"];
 
 export function DashboardNav() {
   const pathname = usePathname();
@@ -21,7 +22,10 @@ export function DashboardNav() {
     <nav aria-label="Dashboard sections">
       <ul className="flex gap-2 overflow-x-auto px-6 pb-4 md:flex-col md:overflow-visible md:pb-6">
         {sections.map((section) => {
-          const isActive = pathname === section.href;
+          // Sub-pages (e.g. Tables & QR → Print) keep their section highlighted.
+          const isActive =
+            pathname === section.href ||
+            (section.href !== "/dashboard" && pathname.startsWith(`${section.href}/`));
 
           return (
             <li key={section.href}>
@@ -40,13 +44,6 @@ export function DashboardNav() {
           );
         })}
 
-        {upcoming.map((label) => (
-          <li key={label} className="hidden md:block">
-            <span className="block rounded-xl px-4 py-3 text-sm text-black/30">
-              {label}
-            </span>
-          </li>
-        ))}
       </ul>
     </nav>
   );
