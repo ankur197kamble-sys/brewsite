@@ -8,6 +8,25 @@ import { withRetry } from "@/app/app/data";
 // Built per request from the café's own name, never from a hard-coded brand.
 export const dynamic = "force-dynamic";
 
+/** Home-screen labels show about 15 characters before they are cut off. */
+const HOME_SCREEN_CHARS = 15;
+
+/**
+ * The label under the app icon: the whole name when it fits ("Coffee
+ * Gruham"), else as many whole words as fit ("Coffee Gruham Badlapur" ->
+ * "Coffee Gruham"), never just a generic first word like "Coffee".
+ */
+function homeScreenName(name: string): string {
+  if (name.length <= HOME_SCREEN_CHARS) return name;
+  let label = "";
+  for (const word of name.split(/\s+/)) {
+    const next = label ? `${label} ${word}` : word;
+    if (next.length > HOME_SCREEN_CHARS) break;
+    label = next;
+  }
+  return label || name.slice(0, HOME_SCREEN_CHARS).trim();
+}
+
 /**
  * Makes the customer app installable ("Add to Home screen"). If the café
  * cannot be read it fails (the browser simply tries again later) rather than
@@ -21,7 +40,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   return {
     id: "/app",
     name: site.name,
-    short_name: site.name.length > 12 ? site.name.split(" ")[0] : site.name,
+    short_name: homeScreenName(site.name),
     description: site.highlights ?? site.tagline,
     start_url: "/app",
     scope: "/",
