@@ -2,9 +2,10 @@ import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { getActiveTableByToken } from "@/app/db/orders";
 import { getPublicCafeId } from "@/app/lib/tenant";
-import { withRetry } from "@/app/app/data";
+import { loadCafeName, withRetry } from "@/app/app/data";
 import { AppUnavailable } from "@/app/app/unavailable";
 import { appFonts } from "@/app/app/fonts";
+import { greetingFor } from "@/app/lib/greeting";
 import { RememberTable } from "./remember-table";
 
 export const dynamic = "force-dynamic";
@@ -59,5 +60,12 @@ export default async function TableLanding({ params }: Props) {
     );
   }
 
-  return <RememberTable token={table.token} label={table.label} />;
+  return (
+    <RememberTable
+      token={table.token}
+      label={table.label}
+      cafeName={await loadCafeName()}
+      greeting={greetingFor(new Date()).title}
+    />
+  );
 }

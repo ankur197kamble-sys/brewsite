@@ -198,7 +198,10 @@ export function StampCard() {
             return (
               <li
                 key={index}
+                style={on ? { animationDelay: `${200 + index * 80}ms` } : undefined}
                 className={`flex aspect-square items-center justify-center rounded-full border transition-colors ${
+                  on ? "app-stamp-on " : ""
+                }${
                   on
                     ? "border-[var(--app-stamp-on)] bg-[var(--app-stamp-on)] text-[var(--app-stamp-on-text)]"
                     : "border-[var(--app-stamp-off)] text-[var(--app-stamp-off)]"

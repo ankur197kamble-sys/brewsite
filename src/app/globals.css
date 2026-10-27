@@ -617,7 +617,6 @@ body:has(.app-theme) {
 @layer components {
   .app-screen {
     padding: calc(env(safe-area-inset-top) + 1.25rem) var(--app-pad) 1.5rem;
-    animation: app-enter 520ms var(--ease-out-expo) both;
   }
 
   .app-muted {
@@ -724,16 +723,7 @@ body:has(.app-theme) {
     font-size: 0.95rem;
     font-weight: 650;
     letter-spacing: -0.005em;
-    transition:
-      transform 180ms var(--ease-smooth),
-      background-color 200ms ease,
-      box-shadow 200ms ease,
-      opacity 200ms ease;
     -webkit-tap-highlight-color: transparent;
-  }
-
-  .app-btn:active:not(:disabled) {
-    transform: scale(0.97);
   }
 
   .app-btn:disabled {
@@ -781,7 +771,7 @@ body:has(.app-theme) {
     font-size: 0.875rem;
     font-weight: 550;
     white-space: nowrap;
-    transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .app-chip[aria-current="true"] {
@@ -806,11 +796,7 @@ body:has(.app-theme) {
     font-size: 1.25rem;
     line-height: 1;
     border-radius: 999px;
-    transition: transform 160ms var(--ease-smooth);
-  }
-
-  .app-stepper button:active:not(:disabled) {
-    transform: scale(0.86);
+    -webkit-tap-highlight-color: transparent;
   }
 
   .app-stepper button:disabled {
@@ -869,16 +855,6 @@ body:has(.app-theme) {
     animation: app-shimmer 1.4s ease-in-out infinite;
   }
 
-  /* Stagger children in as a screen opens. */
-  .app-stagger > * {
-    animation: app-enter 560ms var(--ease-out-expo) both;
-  }
-  .app-stagger > *:nth-child(2) { animation-delay: 60ms; }
-  .app-stagger > *:nth-child(3) { animation-delay: 120ms; }
-  .app-stagger > *:nth-child(4) { animation-delay: 180ms; }
-  .app-stagger > *:nth-child(5) { animation-delay: 240ms; }
-  .app-stagger > *:nth-child(n + 6) { animation-delay: 300ms; }
-
   /* Status stepper: completed steps fill, the current one pulses gently. */
   .app-progress-dot {
     width: 0.85rem;
@@ -926,12 +902,11 @@ body:has(.app-theme) {
     color: var(--app-ticket-text);
     border-radius: var(--app-radius);
     box-shadow: var(--app-ticket-shadow);
-    animation: app-pop 420ms var(--ease-out-expo) both;
   }
 }
 
 @keyframes app-enter {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: none; }
 }
 
@@ -955,14 +930,509 @@ body:has(.app-theme) {
   to { transform: scaleX(1); }
 }
 
+/* ============================================================ app motion
+ * How the customer app moves: a short branded intro once per visit, screens
+ * that rise into place, a soft glow ripple and a springy press on anything
+ * you tap, small "bumps" when a number changes, and a slowly breathing
+ * sunset. Only transform and opacity animate (cheap on phones). With the
+ * phone's "reduce motion" setting on, everything becomes a gentle fade.
+ */
+.app-theme {
+  /* Light text on dark renders crisper without subpixel smoothing. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --app-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* The sunset breathes: a slow rise and fall of the glow. */
+.app-theme::before {
+  animation: app-glow 9s ease-in-out infinite alternate;
+}
+
+/* Fine grain over the glow. Without it, a dark gradient shows visible steps
+   ("banding") on most phone screens and looks low quality. */
+.app-theme::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.9 0 0 0 0 0.8 0 0 0 0.06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+@layer components {
+  /* Screens and their parts rise into place. --app-intro-delay holds them
+     back while the opening intro is on screen. */
+  .app-screen,
+  .app-hero-in {
+    animation: app-enter 620ms var(--ease-out-expo) both;
+    animation-delay: var(--app-intro-delay, 0s);
+  }
+  .app-stagger > * {
+    animation: app-enter 640ms var(--ease-out-expo) both;
+    animation-delay: calc(var(--app-intro-delay, 0s) + 40ms);
+  }
+  .app-stagger > *:nth-child(2) { animation-delay: calc(var(--app-intro-delay, 0s) + 110ms); }
+  .app-stagger > *:nth-child(3) { animation-delay: calc(var(--app-intro-delay, 0s) + 180ms); }
+  .app-stagger > *:nth-child(4) { animation-delay: calc(var(--app-intro-delay, 0s) + 250ms); }
+  .app-stagger > *:nth-child(5) { animation-delay: calc(var(--app-intro-delay, 0s) + 320ms); }
+  .app-stagger > *:nth-child(n + 6) { animation-delay: calc(var(--app-intro-delay, 0s) + 390ms); }
+
+  /* Springy press: quick to go down, a little bounce on release. */
+  .app-btn,
+  .app-chip,
+  .app-stepper button {
+    transition:
+      transform 460ms var(--app-spring),
+      background-color 200ms ease,
+      border-color 200ms ease,
+      color 200ms ease,
+      box-shadow 240ms ease,
+      opacity 200ms ease;
+  }
+  .app-btn:active:not(:disabled),
+  .app-chip:active {
+    transform: scale(0.95);
+    transition-duration: 90ms;
+  }
+  .app-stepper button:active:not(:disabled) {
+    transform: scale(0.82);
+    transition-duration: 90ms;
+  }
+
+  /* Glow ripple from the point you touched (set by AppEffects). */
+  .app-btn,
+  .app-chip,
+  .app-stepper button,
+  .app-tab {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .app-btn::after,
+  .app-chip::after,
+  .app-stepper button::after,
+  .app-tab::after {
+    content: "";
+    position: absolute;
+    left: var(--rx, 50%);
+    top: var(--ry, 50%);
+    width: 12px;
+    height: 12px;
+    margin: -6px 0 0 -6px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(255, 238, 214, 0.6), rgba(255, 238, 214, 0) 70%);
+    opacity: 0;
+    transform: scale(0);
+    pointer-events: none;
+    z-index: -1;
+  }
+  .is-rippling::after {
+    animation: app-ripple 620ms var(--ease-out-expo);
+  }
+
+  /* A number that just changed (quantity, cart badge) bumps. */
+  .app-bump {
+    display: inline-block;
+    animation: app-bump 380ms var(--app-spring);
+  }
+
+  /* Bars that appear from the bottom (the "Review order" bar). */
+  .app-rise {
+    animation: app-rise 520ms var(--ease-out-expo) both;
+  }
+
+  /* The active tab's icon hops. */
+  .app-tab[aria-current="page"] svg {
+    animation: app-hop 560ms var(--app-spring);
+  }
+
+  /* Collected stamps pop in one after another (delay set inline). */
+  .app-stamp-on {
+    animation: app-pop 460ms var(--app-spring) both;
+  }
+
+  /* The ready ticket: a light sweep once, then a slow warm glow. */
+  .app-ticket {
+    position: relative;
+    overflow: hidden;
+    animation:
+      app-pop 460ms var(--app-spring) both,
+      app-ticket-glow 3.4s 900ms ease-in-out infinite;
+  }
+  .app-ticket::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 30%, rgba(255, 232, 206, 0.2) 50%, transparent 70%);
+    transform: translateX(-120%);
+    animation: app-shine 1.5s 500ms ease-out both;
+    pointer-events: none;
+  }
+
+  /* Opening intro, once per visit (about 5 seconds, a tap skips it):
+       0.0s  a sunset rises, rings of light spread
+       0.25s coffee leaves sweep in from the edges
+       0.45s the coffee-bean mandala turns into view
+       0.75s a cup draws itself, steam rises
+       1.95s leaves sweep away, the emblem settles upward
+       2.25s the café's name writes in, underlined
+       3.05s the greeting, "How are you today?", a warm line
+       4.6s  everything fades into the app */
+  .app-intro {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    overflow: hidden;
+    background: #1e140f;
+    color: #f3e3d0;
+    cursor: pointer;
+    animation: app-intro-out 650ms 4.6s ease forwards;
+  }
+  .app-intro--leaving {
+    animation: app-intro-out 320ms ease forwards !important;
+  }
+  .app-intro__scene {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .app-intro .i-sun,
+  .app-intro .i-rays circle,
+  .app-intro .i-emblem,
+  .app-intro .i-ring,
+  .app-intro .i-steam path,
+  .app-intro .i-leaf {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .app-intro .i-sun {
+    animation: i-sunrise 1.6s var(--ease-out-expo) both;
+  }
+  .app-intro .i-rays circle {
+    opacity: 0;
+    animation: i-ray 2.6s ease-out both;
+  }
+  .app-intro .i-rays circle:nth-child(1) { animation-delay: 0.2s; }
+  .app-intro .i-rays circle:nth-child(2) { animation-delay: 0.5s; }
+  .app-intro .i-rays circle:nth-child(3) { animation-delay: 0.8s; }
+
+  .app-intro .i-emblem {
+    animation:
+      i-emblem-in 1s 0.45s var(--ease-out-expo) both,
+      i-emblem-up 0.9s 2.05s var(--ease-out-expo) forwards;
+  }
+  .app-intro .i-ring {
+    animation: i-spin 16s linear infinite;
+  }
+  .app-intro .i-cup path,
+  .app-intro .i-steam path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+  }
+  .app-intro .i-cup path {
+    animation: app-draw 0.9s var(--ease-out-expo) both;
+  }
+  .app-intro .i-cup path:nth-child(1) { animation-delay: 0.75s; }
+  .app-intro .i-cup path:nth-child(2) { animation-delay: 1.05s; }
+  .app-intro .i-cup path:nth-child(3) { animation-delay: 1.2s; }
+  .app-intro .i-steam path {
+    animation:
+      app-draw 0.8s ease-out both,
+      i-steam 2.4s ease-in-out infinite;
+  }
+  .app-intro .i-steam path:nth-child(1) { animation-delay: 1.35s, 2.15s; }
+  .app-intro .i-steam path:nth-child(2) { animation-delay: 1.5s, 2.35s; }
+  .app-intro .i-steam path:nth-child(3) { animation-delay: 1.65s, 2.55s; }
+
+  .app-intro .i-leaf {
+    animation:
+      i-leaf-in 0.95s var(--ease-out-expo) both,
+      i-leaf-out 0.75s ease-in forwards;
+  }
+
+  .app-intro__text {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 41%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 1.5rem;
+    text-align: center;
+  }
+  .app-intro__name {
+    font-family: var(--font-app-script, var(--app-heading-font)), Georgia, serif;
+    font-size: clamp(3.2rem, 2.4rem + 6vw, 4.2rem);
+    line-height: 1.1;
+    animation: app-intro-name 1s 2.25s var(--ease-out-expo) both;
+  }
+  .app-intro__line {
+    width: min(14rem, 70vw);
+    height: 1.5rem;
+    margin-top: 0.25rem;
+    color: #e2915a;
+  }
+  .app-intro__line path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: app-draw 0.85s 2.75s var(--ease-out-expo) both;
+  }
+  .app-intro__greet {
+    margin-top: 1.4rem;
+    font-family: var(--app-heading-font), Georgia, serif;
+    font-style: italic;
+    font-weight: 600;
+    font-size: 2.1rem;
+    line-height: 1.1;
+    animation: app-intro-rise 0.75s 3.05s var(--ease-out-expo) both;
+  }
+  .app-intro__ask {
+    margin-top: 0.3rem;
+    font-family: var(--app-heading-font), Georgia, serif;
+    font-style: italic;
+    font-weight: 500;
+    font-size: 1.35rem;
+    color: #e8d2bb;
+    animation: app-intro-rise 0.75s 3.3s var(--ease-out-expo) both;
+  }
+  .app-intro__msg {
+    margin-top: 0.9rem;
+    max-width: 18rem;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: #c4a68d;
+    animation: app-intro-rise 0.75s 3.55s var(--ease-out-expo) both;
+  }
+
+  /* The QR landing screen: a short version that stays until the menu opens. */
+  .app-intro--stay {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+    cursor: default;
+    animation: none;
+  }
+  .app-intro--stay::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(110% 60% at 50% 100%, rgba(214, 120, 62, 0.42), rgba(214, 120, 62, 0) 70%),
+      radial-gradient(80% 40% at 50% 0%, rgba(206, 112, 58, 0.16), rgba(206, 112, 58, 0) 70%);
+    animation: app-sunrise 1.3s var(--ease-out-expo) both;
+  }
+  .app-intro--stay > * {
+    position: relative;
+  }
+  .app-intro--stay .app-intro__name {
+    animation-delay: 0.15s;
+  }
+  .app-intro--stay .app-intro__line path {
+    animation-delay: 0.55s;
+  }
+  .app-intro__detail {
+    margin-top: 0.75rem;
+    font-size: 0.72rem;
+    font-weight: 650;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #c4a68d;
+    animation: app-fade 700ms 700ms ease both;
+  }
+}
+
+@keyframes app-glow {
+  from { opacity: 0.78; }
+  to { opacity: 1; }
+}
+
+@keyframes app-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes app-ripple {
+  0% { opacity: 0.9; transform: scale(0); }
+  100% { opacity: 0; transform: scale(var(--rs, 24)); }
+}
+
+@keyframes app-ripple-fade {
+  0% { opacity: 0.7; transform: scale(var(--rs, 24)); }
+  100% { opacity: 0; transform: scale(var(--rs, 24)); }
+}
+
+@keyframes app-bump {
+  0% { transform: scale(0.7); opacity: 0.4; }
+  60% { transform: scale(1.22); opacity: 1; }
+  100% { transform: none; }
+}
+
+@keyframes app-rise {
+  from { opacity: 0; transform: translateY(120%); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes app-hop {
+  0% { transform: none; }
+  35% { transform: translateY(-5px) scale(1.12); }
+  100% { transform: none; }
+}
+
+@keyframes app-ticket-glow {
+  0%, 100% { box-shadow: var(--app-ticket-shadow); }
+  50% { box-shadow: 0 22px 60px -16px rgba(214, 128, 70, 0.75); }
+}
+
+@keyframes app-shine {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(120%); }
+}
+
+@keyframes app-intro-out {
+  to { opacity: 0; visibility: hidden; }
+}
+
+@keyframes app-sunrise {
+  from { opacity: 0; transform: translateY(18%); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes app-intro-name {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+/* Lines that draw themselves. Hidden until they start, or their round
+   ends would show as dots while waiting. */
+@keyframes app-draw {
+  0% { stroke-dashoffset: 1; opacity: 0; }
+  1% { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes app-intro-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes i-sunrise {
+  from { opacity: 0; transform: translateY(170px) scale(0.9); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes i-ray {
+  0% { opacity: 0; transform: scale(0.55); }
+  30% { opacity: 0.2; }
+  100% { opacity: 0; transform: scale(1.4); }
+}
+
+@keyframes i-emblem-in {
+  from { opacity: 0; transform: scale(0.7) rotate(-25deg); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes i-emblem-up {
+  to { transform: translateY(-128px) scale(0.6); }
+}
+
+@keyframes i-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes i-steam {
+  0%, 100% { transform: translateY(0); opacity: 0.85; }
+  50% { transform: translateY(-7px); opacity: 0.35; }
+}
+
+@keyframes i-leaf-in {
+  from { opacity: 0; transform: translateX(-240px) rotate(-14deg); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes i-leaf-out {
+  to { opacity: 0; transform: translateX(-270px) rotate(12deg); }
+}
+
+/* "Reduce motion" on: nothing moves, but things still fade in and out, so
+   the app never feels frozen. */
 @media (prefers-reduced-motion: reduce) {
   .app-screen,
+  .app-hero-in,
   .app-stagger > *,
   .app-stepper,
-  .app-ticket,
+  .app-bump,
+  .app-rise,
+  .app-stamp-on,
+  .app-intro__name {
+    animation-name: app-fade !important;
+  }
+  .app-ticket {
+    animation: app-fade 460ms ease both !important;
+  }
+  .app-ticket::after,
+  .app-tab[aria-current="page"] svg,
+  .app-theme::before,
   .app-skeleton,
   .app-progress-dot,
   .app-progress-line[data-state="done"]::after {
     animation: none !important;
+  }
+  /* The intro becomes a calm still: the drawn cup and the name, the
+     greeting fading in, then the app. */
+  .app-intro .i-sun,
+  .app-intro .i-rays circle,
+  .app-intro .i-emblem,
+  .app-intro .i-ring,
+  .app-intro .i-steam path,
+  .app-intro .i-leaf,
+  .app-intro--stay::before {
+    animation: none !important;
+  }
+  .app-intro .i-leaf,
+  .app-intro .i-rays {
+    display: none;
+  }
+  .app-intro .i-emblem {
+    transform: translateY(-128px) scale(0.6);
+  }
+  .app-intro .i-cup path,
+  .app-intro .i-steam path,
+  .app-intro__line path {
+    animation: app-fade 600ms 200ms ease both !important;
+    stroke-dashoffset: 0;
+  }
+  .app-intro__name,
+  .app-intro__greet,
+  .app-intro__ask,
+  .app-intro__msg {
+    animation-name: app-fade !important;
+    animation-delay: 300ms !important;
+  }
+  .app-intro {
+    animation-delay: 2.2s !important;
+  }
+  .app-theme:has(> .app-intro) {
+    --app-intro-delay: 2.4s !important;
+  }
+  .is-rippling::after {
+    animation-name: app-ripple-fade !important;
+  }
+  .app-btn:active:not(:disabled),
+  .app-chip:active,
+  .app-stepper button:active:not(:disabled) {
+    transform: none;
+    filter: brightness(1.15);
   }
 }

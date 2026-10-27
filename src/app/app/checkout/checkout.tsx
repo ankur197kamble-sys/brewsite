@@ -209,7 +209,11 @@ export function Checkout({ menu }: { menu: AppMenuSection[] }) {
               <button type="button" onClick={() => setQuantity(item.id, quantity - 1)} aria-label={`One less ${item.name}`}>
                 −
               </button>
-              <span aria-live="polite" className="w-6 text-center font-semibold tabular-nums">{quantity}</span>
+              <span aria-live="polite" className="w-6 text-center font-semibold tabular-nums">
+                <span key={quantity} className="app-bump">
+                  {quantity}
+                </span>
+              </span>
               <button
                 type="button"
                 onClick={() => setQuantity(item.id, quantity + 1)}

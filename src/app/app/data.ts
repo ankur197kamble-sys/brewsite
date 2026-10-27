@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cafe as fallbackCafe } from "@/app/data/cafe";
 import { getCafe } from "@/app/db/cafe";
 import { getMenu } from "@/app/db/menu";
@@ -77,12 +78,15 @@ export async function loadAppData(): Promise<AppData | null> {
   }
 }
 
-/** The café's own name, or null if it cannot be read right now. */
-export async function loadCafeName(): Promise<string | null> {
+/**
+ * The café's own name, or null if it cannot be read right now. Cached for
+ * the request, since the page title and the opening intro both need it.
+ */
+export const loadCafeName = cache(async (): Promise<string | null> => {
   try {
     const dbCafe = await withRetry(() => getCafe(getPublicCafeId()));
     return dbCafe ? getSiteCafe(dbCafe, fallbackCafe).name : null;
   } catch {
     return null;
   }
-}
+});
