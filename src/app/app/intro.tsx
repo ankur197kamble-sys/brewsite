@@ -3,12 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { Greeting } from "@/app/lib/greeting";
 import { scriptFont } from "./script-font";
-
-/** Set once the intro has played, so it shows once per visit (browser session). */
-export const INTRO_COOKIE = "brewsite_intro";
-
-/** How long the first screen waits behind the intro (matches .app-intro timing). */
-export const INTRO_HOLD = "4.9s";
+import { INTRO_COOKIE } from "./intro-settings";
 
 /** Remembers for this visit that the intro has been seen. */
 export function markIntroSeen() {

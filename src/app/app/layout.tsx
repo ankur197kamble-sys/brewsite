@@ -7,7 +7,8 @@ import { AppTabBar } from "./tab-bar";
 import { ServiceWorker } from "./service-worker";
 import { appFonts } from "./fonts";
 import { AppEffects } from "./effects";
-import { AppIntro, INTRO_COOKIE, INTRO_HOLD } from "./intro";
+import { AppIntro } from "./intro";
+import { INTRO_COOKIE, INTRO_HOLD } from "./intro-settings";
 import { greetingFor } from "@/app/lib/greeting";
 
 export const dynamic = "force-dynamic";
