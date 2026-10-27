@@ -15,8 +15,15 @@
  */
 export const INTRO_COOKIE = "brewsite_intro_seen";
 
-/** Away this long, and the intro plays again on the next open. */
+/** Away this long, and the intro plays again on the next open in a browser. */
 export const INTRO_REST_SECONDS = 30 * 60;
+
+/**
+ * The installed app opens at /app?launch=1 (the manifest's start_url), so a
+ * launch from the home-screen icon always plays the intro, like a native
+ * app's opening animation, whenever the intro was last seen.
+ */
+export const LAUNCH_PARAM = "launch";
 
 /** How long the first screen waits behind the intro (matches .app-intro timing). */
 export const INTRO_HOLD = "4.9s";

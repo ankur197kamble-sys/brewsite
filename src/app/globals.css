@@ -1438,7 +1438,7 @@ body:has(.app-theme) {
   .app-intro {
     animation-delay: 2.2s !important;
   }
-  .app-theme:has(> .app-intro) {
+  [data-intro]:has(> .app-intro) {
     --app-intro-delay: 2.2s !important;
   }
   [data-rippling]::after {
