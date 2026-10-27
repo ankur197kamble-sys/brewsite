@@ -1,4 +1,6 @@
+import type { CSSProperties } from "react";
 import Image from "next/image";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { formatOfferDate } from "@/app/lib/offers";
 import { STAMPS_PER_REWARD } from "@/app/lib/orders";
@@ -9,14 +11,27 @@ import { scriptFont } from "./script-font";
 import { GreetingCard } from "./greeting-card";
 import { greetingFor } from "@/app/lib/greeting";
 import { AppUnavailable } from "./unavailable";
+import { AppIntro } from "./intro";
+import { INTRO_COOKIE, INTRO_HOLD, LAUNCH_PARAM } from "./intro-settings";
 
 type Action = { href: string; label: string; external: boolean };
 
-/** App home: the café at a glance, ordering, offers, stamps and quick actions. */
-export default async function AppHome() {
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+/**
+ * App home: the café at a glance, ordering, offers, stamps and quick actions.
+ * Opens with the intro when launched from the home-screen icon, or in a
+ * browser when it has not played in the last INTRO_REST_SECONDS.
+ */
+export default async function AppHome({ searchParams }: Props) {
   const data = await loadAppData();
   if (!data) return <AppUnavailable />;
   const { cafe, menu, offers } = data;
+
+  const launched = (await searchParams)[LAUNCH_PARAM] !== undefined;
+  const seenRecently = (await cookies()).get(INTRO_COOKIE)?.value === "1";
+  const intro = launched || !seenRecently;
+  const greeting = greetingFor(new Date());
 
   const actions = [
     cafe.phone ? { href: telHref(cafe.phone), label: "Call", external: false } : null,
@@ -26,7 +41,11 @@ export default async function AppHome() {
   ].filter((action): action is Action => action !== null);
 
   return (
-    <main>
+    <main
+      data-intro={intro ? "" : undefined}
+      style={intro ? ({ "--app-intro-delay": INTRO_HOLD } as CSSProperties) : undefined}
+    >
+      {intro && <AppIntro name={cafe.name} greeting={greeting} />}
       <header className={`${scriptFont} relative isolate flex min-h-[19rem] flex-col justify-end overflow-hidden px-[var(--app-pad)] pt-[calc(env(safe-area-inset-top)+2.5rem)] pb-7 text-[#fffaf3]`}>
         <Image
           src={cafe.heroImage}
@@ -51,7 +70,7 @@ export default async function AppHome() {
       </header>
 
       <div className="app-stagger relative z-10 -mt-5 space-y-5 px-[var(--app-pad)] pb-6">
-        <GreetingCard greeting={greetingFor(new Date())} />
+        <GreetingCard greeting={greeting} />
 
         {/* Server-rendered wrappers: the entry animation runs on them, so a
             card that only appears after loading (a live order, the install

@@ -42,7 +42,8 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     name: site.name,
     short_name: homeScreenName(site.name),
     description: site.highlights ?? site.tagline,
-    start_url: "/app",
+    // Marks a launch from the home-screen icon: the intro plays every time.
+    start_url: "/app?launch=1",
     scope: "/",
     display: "standalone",
     orientation: "portrait",

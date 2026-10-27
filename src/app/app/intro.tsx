@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Greeting } from "@/app/lib/greeting";
 import { scriptFont } from "./script-font";
-import { INTRO_COOKIE, INTRO_REST_SECONDS } from "./intro-settings";
+import { INTRO_COOKIE, INTRO_REST_SECONDS, LAUNCH_PARAM } from "./intro-settings";
 
 /** Remembers that the intro has just been seen (for INTRO_REST_SECONDS). */
 export function markIntroSeen() {
@@ -48,7 +48,7 @@ export function AppIntro({ name, greeting }: { name: string; greeting: Greeting 
   const [done, setDone] = useState(false);
 
   const finish = useCallback(() => {
-    root.current?.closest<HTMLElement>(".app-theme")?.style.setProperty("--app-intro-delay", "0s", "important");
+    root.current?.parentElement?.style.setProperty("--app-intro-delay", "0s", "important");
     setDone(true);
   }, []);
 
@@ -57,12 +57,19 @@ export function AppIntro({ name, greeting }: { name: string; greeting: Greeting 
     if (!element || element.classList.contains("app-intro--leaving")) return;
     element.classList.add("app-intro--leaving");
     // The page underneath comes in now rather than when the intro would have ended.
-    element.closest<HTMLElement>(".app-theme")?.style.setProperty("--app-intro-delay", "0s", "important");
+    element.parentElement?.style.setProperty("--app-intro-delay", "0s", "important");
     setTimeout(finish, SKIP_FADE_MS);
   }, [finish]);
 
   useEffect(() => {
     markIntroSeen();
+    // Drop "?launch=1" from the address, so pulling down to refresh does not
+    // replay the intro.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has(LAUNCH_PARAM)) {
+      url.searchParams.delete(LAUNCH_PARAM);
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const end = reduced ? INTRO_END_REDUCED_MS : INTRO_END_MS;
     const timer = setTimeout(finish, Math.max(0, end - performance.now()));
