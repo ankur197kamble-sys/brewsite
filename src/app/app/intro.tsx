@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Greeting } from "@/app/lib/greeting";
 import { scriptFont } from "./script-font";
-import { INTRO_COOKIE } from "./intro-settings";
+import { INTRO_COOKIE, INTRO_REST_SECONDS } from "./intro-settings";
 
-/** Remembers for this visit that the intro has been seen. */
+/** Remembers that the intro has just been seen (for INTRO_REST_SECONDS). */
 export function markIntroSeen() {
-  document.cookie = `${INTRO_COOKIE}=1; path=/; SameSite=Lax`;
+  document.cookie = `${INTRO_COOKIE}=1; path=/; max-age=${INTRO_REST_SECONDS}; SameSite=Lax`;
 }
 
 /**
@@ -33,7 +33,7 @@ const LEAVES: { x: number; y: number; angle: number; delay: number }[] = [
 ];
 
 /**
- * The opening moment, once per visit: the app icon's emblem grows out of the
+ * The opening moment, on opening the app after a break: the app icon's emblem grows out of the
  * splash screen, a sunset rises, coffee leaves sweep in and away, then the
  * café's name writes in and the greeting appears. All CSS and vector art
  * (see .app-intro in globals.css), rendered by the server so it is there

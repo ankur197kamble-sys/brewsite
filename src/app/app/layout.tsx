@@ -31,9 +31,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * The customer app: a phone-sized column with a bottom tab bar. The first
- * screen of a visit opens with the café's intro; after that, never again
- * until the browser (or installed app) is closed.
+ * The customer app: a phone-sized column with a bottom tab bar. Opening it
+ * after a break (see INTRO_REST_SECONDS) plays the café's intro first; within
+ * that time it opens straight to the screen.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const seen = (await cookies()).get(INTRO_COOKIE)?.value === "1";
