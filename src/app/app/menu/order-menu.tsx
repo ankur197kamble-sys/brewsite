@@ -107,7 +107,7 @@ export function OrderMenu({ menu }: { menu: AppMenuSection[] }) {
 
   return (
     <main className="pt-[env(safe-area-inset-top)]">
-      <div className="sticky top-0 z-30 border-b border-[var(--line)] bg-[#f3eee5]/92 backdrop-blur-xl">
+      <div className="sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--app-bar-bg)] backdrop-blur-xl">
         <div className="flex items-end justify-between px-[var(--app-pad)] pt-5">
           <h1 className="app-title">Menu</h1>
           {hydrated && (
@@ -218,7 +218,7 @@ export function OrderMenu({ menu }: { menu: AppMenuSection[] }) {
             className="app-btn app-btn-accent mx-auto flex min-h-[3.75rem] max-w-md justify-between rounded-[1.1rem] px-5 text-base"
           >
             <span className="flex items-center gap-3">
-              <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-white px-2 text-sm text-[var(--app-accent-fill)] tabular-nums">
+              <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-[var(--app-cta-text)] px-2 text-sm text-[var(--app-cta-bg)] tabular-nums">
                 {summary.count}
               </span>
               Review order

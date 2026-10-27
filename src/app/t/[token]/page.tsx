@@ -1,12 +1,15 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { getActiveTableByToken } from "@/app/db/orders";
 import { getPublicCafeId } from "@/app/lib/tenant";
 import { withRetry } from "@/app/app/data";
 import { AppUnavailable } from "@/app/app/unavailable";
+import { appFonts } from "@/app/app/fonts";
 import { RememberTable } from "./remember-table";
 
 export const dynamic = "force-dynamic";
+
+export const viewport: Viewport = { themeColor: "#1e140f" };
 
 export const metadata: Metadata = {
   title: "Order at your table",
@@ -31,7 +34,7 @@ export default async function TableLanding({ params }: Props) {
   } catch {
     // A network blip is not a dead QR code: offer a retry instead.
     return (
-      <div className="min-h-dvh bg-[#f3eee5] text-[#201a16]">
+      <div className={`app-theme ${appFonts} min-h-dvh`}>
         <div className="mx-auto max-w-md">
           <AppUnavailable />
         </div>
@@ -41,7 +44,7 @@ export default async function TableLanding({ params }: Props) {
 
   if (!table) {
     return (
-      <main className="flex min-h-dvh items-center justify-center bg-[#f3eee5] px-6 text-center text-[#201a16]">
+      <main className={`app-theme ${appFonts} flex min-h-dvh items-center justify-center px-6 text-center`}>
         <div className="max-w-sm">
           <p className="app-label">QR code not recognised</p>
           <h1 className="app-title mt-3">This code is no longer active</h1>

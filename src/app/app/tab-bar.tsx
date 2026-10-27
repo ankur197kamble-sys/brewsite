@@ -65,7 +65,7 @@ export function AppTabBar() {
   return (
     <nav
       aria-label="App"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-[#fbf8f2]/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-[var(--app-bar-bg)] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl"
     >
       <ul className="mx-auto grid max-w-md grid-cols-4">
         {TABS.map((tab) => {
@@ -76,19 +76,19 @@ export function AppTabBar() {
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
                 className={`relative flex min-h-[4.25rem] flex-col items-center justify-center gap-1 text-[0.72rem] font-semibold tracking-wide transition-colors duration-200 ${
-                  active ? "text-[var(--app-accent-ink)]" : "text-[var(--app-muted)]"
+                  active ? "text-[var(--app-nav-active)]" : "text-[var(--app-muted)]"
                 }`}
               >
                 <span
                   aria-hidden="true"
-                  className={`absolute top-0 h-[3px] w-8 rounded-b-full bg-[var(--accent)] transition-transform duration-300 ${
+                  className={`absolute top-0 h-[3px] w-8 rounded-b-full bg-[var(--app-nav-active)] transition-transform duration-300 ${
                     active ? "scale-x-100" : "scale-x-0"
                   }`}
                 />
                 {tab.icon}
                 {tab.label}
                 {tab.href === "/app/menu" && cartCount > 0 && (
-                  <span className="absolute top-2 left-1/2 ml-2.5 min-w-5 rounded-full bg-[var(--app-accent-fill)] px-1.5 text-center text-[0.68rem] leading-5 font-bold text-white">
+                  <span className="absolute top-2 left-1/2 ml-2.5 min-w-5 rounded-full bg-[var(--app-cta-bg)] px-1.5 text-center text-[0.68rem] leading-5 font-bold text-[var(--app-cta-text)]">
                     {cartCount}
                     <span className="sr-only"> in your order</span>
                   </span>

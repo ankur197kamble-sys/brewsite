@@ -190,7 +190,7 @@ export function Checkout({ menu }: { menu: AppMenuSection[] }) {
 
   return (
     <main className="app-screen">
-      <Link href="/app/menu" className="app-muted inline-flex min-h-11 items-center text-sm font-medium">
+      <Link href="/app/menu" className="app-link inline-flex min-h-11 items-center text-sm">
         ← Back to menu
       </Link>
       <h1 ref={headingRef} tabIndex={-1} className="app-title mt-1 outline-none">
@@ -229,10 +229,10 @@ export function Checkout({ menu }: { menu: AppMenuSection[] }) {
 
       <form onSubmit={placeOrder} className="mt-6 space-y-5 pb-6">
         {error && (
-          <div role="alert" className="rounded-xl border border-red-900/20 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <div role="alert" className="app-alert px-4 py-3 text-sm">
             <p>{error}</p>
             {earlier && (
-              <Link href={`/app/orders/${earlier.token}`} className="mt-2 inline-flex min-h-11 items-center font-semibold underline underline-offset-4">
+              <Link href={`/app/orders/${earlier.token}`} className="app-link mt-2 inline-flex min-h-11 items-center underline underline-offset-4">
                 View order #{earlier.number}
               </Link>
             )}
@@ -261,7 +261,7 @@ export function Checkout({ menu }: { menu: AppMenuSection[] }) {
               type="checkbox"
               checked={loyaltyValue}
               onChange={(event) => setLoyalty(event.target.checked)}
-              className="mt-1 h-5 w-5 accent-[var(--app-accent-fill)]"
+              className="mt-1 h-5 w-5 accent-[var(--app-cta-bg)]"
             />
             <span>
               <span className="font-semibold">Collect a loyalty stamp</span>
@@ -288,7 +288,7 @@ export function Checkout({ menu }: { menu: AppMenuSection[] }) {
                 aria-describedby="phone-hint"
                 className={fieldClass}
               />
-              <p id="phone-hint" className={`mt-1.5 text-xs ${phoneProblem ? "text-red-900" : "app-muted"}`}>
+              <p id="phone-hint" className={`mt-1.5 text-xs ${phoneProblem ? "text-[var(--app-alert-text)]" : "app-muted"}`}>
                 {phoneProblem ? "Enter a 10-digit Indian mobile number." : "10-digit mobile number."}
               </p>
             </div>

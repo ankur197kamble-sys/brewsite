@@ -96,7 +96,7 @@ export function OrderStatusView({ token }: { token: string }) {
       {order.status === "ready" && (
         <section aria-label="Collection ticket" className="app-ticket mt-6 px-5 pt-5 pb-6 text-center">
           <p className="text-[0.7rem] font-semibold tracking-[0.18em] uppercase">Show this at the counter</p>
-          <p className="font-display mt-2 text-7xl leading-none tracking-tight tabular-nums">#{order.number}</p>
+          <p className="app-display mt-2 text-7xl leading-none tabular-nums">#{order.number}</p>
           <p className="mt-3 font-semibold">
             {order.customerName} · {order.tableLabel}
           </p>
@@ -131,13 +131,13 @@ export function OrderStatusView({ token }: { token: string }) {
           </ol>
           {active &&
             (stale ? (
-              <p role="status" className="mt-4 flex items-center gap-2 text-xs font-semibold text-red-900">
-                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-red-800" />
+              <p role="status" className="mt-4 flex items-center gap-2 text-xs font-semibold text-[var(--app-alert-text)]">
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[var(--app-alert-text)]" />
                 No connection. Showing the last update, retrying…
               </p>
             ) : (
               <p className="app-muted mt-4 flex items-center gap-2 text-xs">
-                <span aria-hidden="true" className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)] motion-reduce:animate-none" />
+                <span aria-hidden="true" className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--app-live-dot)] motion-reduce:animate-none" />
                 Updates automatically
               </p>
             ))}
@@ -200,8 +200,11 @@ function StampSummary({ loyalty }: { loyalty: NonNullable<PublicOrderView["loyal
   const { card } = loyalty;
   return (
     <Link href="/app/stamps" className="app-card-dark mt-4 block p-5 transition-transform active:scale-[0.99]">
-      <p className="text-[0.7rem] font-semibold tracking-[0.18em] text-[var(--accent-soft)] uppercase">
-        Loyalty · ending {loyalty.phone}
+      <p className="flex justify-between text-[0.7rem] font-semibold tracking-[0.18em] text-[var(--app-deep-label)] uppercase">
+        <span>Loyalty · ending {loyalty.phone}</span>
+        <span aria-hidden="true" className="app-go text-base leading-none tracking-normal">
+          ›
+        </span>
       </p>
       <p className="app-heading mt-1">
         {!card
@@ -210,7 +213,7 @@ function StampSummary({ loyalty }: { loyalty: NonNullable<PublicOrderView["loyal
             ? `You have ${card.rewardsAvailable} treat${card.rewardsAvailable === 1 ? "" : "s"} to claim!`
             : `${stampsOnCard(card.stamps, card.rewardsAvailable)} of ${STAMPS_PER_REWARD} stamps`}
       </p>
-      <p className="mt-1 text-sm text-white/70">
+      <p className="mt-1 text-sm text-[var(--app-deep-muted)]">
         {card ? "This order earned you a stamp. Thank you!" : "You'll get it when you collect this order at the counter."}
       </p>
     </Link>

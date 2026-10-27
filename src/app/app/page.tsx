@@ -5,6 +5,7 @@ import { STAMPS_PER_REWARD } from "@/app/lib/orders";
 import { telHref, whatsappHref } from "@/app/lib/site-cafe";
 import { loadAppData } from "./data";
 import { InstallPrompt, OrderStart } from "./home-widgets";
+import { scriptFont } from "./script-font";
 import { AppUnavailable } from "./unavailable";
 
 type Action = { href: string; label: string; external: boolean };
@@ -24,7 +25,7 @@ export default async function AppHome() {
 
   return (
     <main>
-      <header className="relative isolate flex min-h-[19rem] flex-col justify-end overflow-hidden px-[var(--app-pad)] pt-[calc(env(safe-area-inset-top)+2.5rem)] pb-7 text-[#fffaf3]">
+      <header className={`${scriptFont} relative isolate flex min-h-[19rem] flex-col justify-end overflow-hidden px-[var(--app-pad)] pt-[calc(env(safe-area-inset-top)+2.5rem)] pb-7 text-[#fffaf3]`}>
         <Image
           src={cafe.heroImage}
           alt=""
@@ -35,15 +36,15 @@ export default async function AppHome() {
         />
         <div
           aria-hidden="true"
-          className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(20,14,10,.28)_0%,rgba(20,14,10,.55)_45%,rgba(20,14,10,.92)_100%)]"
+          className="app-hero-shade absolute inset-0 -z-10"
         />
         {cafe.highlights && (
-          <p className="text-[0.7rem] font-semibold tracking-[0.18em] text-white/80 uppercase">
+          <p className="text-[0.7rem] font-semibold tracking-[0.18em] text-[#f3e3d0] uppercase [text-shadow:0_1px_10px_rgba(0,0,0,0.55)]">
             {cafe.highlights}
           </p>
         )}
-        <h1 className="font-display mt-3 text-[2.6rem] leading-[0.95] tracking-[-0.035em]">{cafe.name}</h1>
-        <p className="mt-2 text-[1.05rem] text-white/85">{cafe.tagline}</p>
+        <h1 className="app-script mt-2 text-[3.4rem]">{cafe.name}</h1>
+        <p className="mt-2 text-[1.05rem] text-[#f3e3d0] [text-shadow:0_1px_10px_rgba(0,0,0,0.55)]">{cafe.tagline}</p>
       </header>
 
       <div className="app-stagger relative z-10 -mt-5 space-y-5 px-[var(--app-pad)] pb-6">
@@ -73,20 +74,20 @@ export default async function AppHome() {
         >
           <span
             aria-hidden="true"
-            className="font-display flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-[var(--accent-soft)]/50 text-2xl text-[var(--accent-soft)]"
+            className="app-display flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-[var(--app-deep-label)] text-2xl text-[var(--app-deep-label)]"
           >
             {STAMPS_PER_REWARD}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[0.7rem] font-semibold tracking-[0.18em] text-[var(--accent-soft)] uppercase">
+            <span className="block text-[0.7rem] font-semibold tracking-[0.18em] text-[var(--app-deep-label)] uppercase">
               Loyalty card
             </span>
             <span className="app-heading mt-1 block text-[1.25rem]">
               Collect {STAMPS_PER_REWARD} stamps, get a treat on us
             </span>
-            <span className="mt-1 block text-sm text-white/70">One stamp for every order you collect.</span>
+            <span className="mt-1 block text-sm text-[var(--app-deep-muted)]">One stamp for every order you collect.</span>
           </span>
-          <span aria-hidden="true" className="text-xl text-white/60">
+          <span aria-hidden="true" className="app-go text-xl">
             ›
           </span>
         </Link>

@@ -41,15 +41,15 @@ export function OrderStart({ hasMenu }: { hasMenu: boolean }) {
         className="app-card flex items-center gap-4 p-5 transition-transform active:scale-[0.99]"
       >
         <span aria-hidden="true" className="relative flex h-3 w-3 shrink-0">
-          <span className="absolute inset-0 animate-ping rounded-full bg-[var(--accent)] opacity-60 motion-reduce:animate-none" />
-          <span className="relative h-3 w-3 rounded-full bg-[var(--accent)]" />
+          <span className="absolute inset-0 animate-ping rounded-full bg-[var(--app-live-dot)] opacity-60 motion-reduce:animate-none" />
+          <span className="relative h-3 w-3 rounded-full bg-[var(--app-live-dot)]" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="app-label block">Order #{live.number}</span>
           <span className="app-heading mt-1 block">{STATUS_LABEL[live.status]}</span>
           <span className="app-muted block text-sm">{live.tableLabel} · tap to follow</span>
         </span>
-        <span aria-hidden="true" className="app-muted text-xl">
+        <span aria-hidden="true" className="app-go text-xl">
           ›
         </span>
       </Link>
