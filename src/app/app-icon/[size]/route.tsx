@@ -34,8 +34,8 @@ export async function GET(_request: Request, context: Context) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#201a16",
-          color: "#f3e3cf",
+          background: "#1e140f",
+          color: "#f3e3d0",
           fontSize: size * 0.36,
           fontWeight: 700,
           letterSpacing: size * -0.01,
@@ -49,7 +49,7 @@ export async function GET(_request: Request, context: Context) {
             width: size * 0.62,
             height: size * 0.62,
             borderRadius: "50%",
-            border: `${Math.max(2, size * 0.018)}px solid #b56e45`,
+            border: `${Math.max(2, size * 0.018)}px solid #e2915a`,
           }}
         >
           {initials(name)}

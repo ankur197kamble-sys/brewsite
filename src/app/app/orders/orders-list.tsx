@@ -64,7 +64,7 @@ function OrderRow({ order }: { order: SavedOrder }) {
             {view && (
               <span
                 className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                  active ? "bg-[var(--app-accent-fill)] text-white" : "bg-[var(--line)] text-[var(--foreground)]"
+                  active ? "bg-[var(--app-badge-bg)] text-[var(--app-badge-text)]" : "bg-[var(--line)] text-[var(--foreground)]"
                 }`}
               >
                 {STATUS_LABEL[view.status]}
@@ -89,7 +89,7 @@ function OrderRow({ order }: { order: SavedOrder }) {
             {view ? ` · ${formatPaise(view.totalPaise)}` : ""}
           </span>
         </span>
-        <span aria-hidden="true" className="app-muted text-xl">
+        <span aria-hidden="true" className="app-go text-xl">
           ›
         </span>
       </Link>

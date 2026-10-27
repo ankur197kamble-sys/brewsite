@@ -7,7 +7,7 @@
  * dashboard or sign-in pages), so menus, prices and order status are always
  * live, and staff screens behave like any other website.
  */
-const CACHE = "brewsite-offline-v2";
+const CACHE = "brewsite-offline-v3";
 const OFFLINE_URL = "/offline";
 
 self.addEventListener("install", (event) => {

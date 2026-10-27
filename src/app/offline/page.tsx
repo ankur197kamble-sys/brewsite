@@ -1,4 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { appFonts } from "@/app/app/fonts";
+
+export const viewport: Viewport = { themeColor: "#1e140f" };
 
 export const metadata: Metadata = {
   title: "Offline",
@@ -13,7 +16,7 @@ export const metadata: Metadata = {
  */
 export default function Offline() {
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-[#f3eee5] px-6 text-center text-[#201a16]">
+    <main className={`app-theme ${appFonts} flex min-h-dvh items-center justify-center px-6 text-center`}>
       <div className="max-w-sm">
         <p className="app-label">No connection</p>
         <h1 className="app-title mt-3">You&apos;re offline</h1>

@@ -435,20 +435,181 @@ body {
 }
 
 /* ============================================================ customer app
- * One small design system for every /app screen: same type ramp, surfaces,
- * buttons and motion, tuned for phones (48px targets, safe areas) and for
- * contrast (muted text at 5:1 or better on the paper background).
+ * One small design system for every customer-app screen: same type ramp,
+ * surfaces, buttons and motion, tuned for phones (44px+ targets, safe areas)
+ * and for contrast (every text colour checked against WCAG AA).
+ *
+ * Everything reads --app-* tokens. :root holds the light "paper" values (the
+ * site-wide error page uses them); .app-theme, set on the customer app's own
+ * screens, switches to "dusk": dark warm browns lit by a dull sunset glow,
+ * one colour family throughout, with only things you can press in amber.
  */
 :root {
+  --app-bg: var(--background);
+  --app-text: var(--foreground);
   --app-muted: #665a50; /* 5.8:1 on --background, 6.3:1 on --surface */
-  /* The brand copper is 3.4:1 on paper: fine for dots and borders, too light
-     for text. Text and button fills use deeper shades that pass WCAG AA. */
-  --app-accent-ink: #8f5230; /* 5.3:1 on --background */
-  --app-accent-fill: #9c5a35; /* white text on it: 5.4:1 */
-  --app-radius: 1.25rem;
+  --app-label: #8f5230; /* 5.3:1 on --background */
+  --app-accent-ink: #8f5230;
+  /* Buttons. The brand copper is 3.4:1 on paper: too light for text, so
+     fills use a deeper shade (white on it: 5.4:1). */
+  --app-btn-bg: var(--foreground);
+  --app-btn-text: #fffaf3;
+  --app-cta-bg: #9c5a35;
+  --app-cta-text: #fff;
+  --app-cta-shadow: 0 10px 24px -12px rgba(156, 90, 53, 0.8);
+  --app-outline: rgba(32, 26, 22, 0.22);
+  --app-outline-text: var(--foreground);
+  --app-link: #8f5230;
+  --app-chip-bg: var(--surface);
+  --app-chip-border: var(--line);
+  --app-chip-text: var(--foreground);
+  --app-nav-active: #8f5230;
+  --app-bar-bg: rgba(251, 248, 242, 0.92);
+  /* Surfaces */
+  --app-card-bg: var(--surface);
+  --app-card-border: var(--line);
   --app-shadow: 0 1px 2px rgba(32, 26, 22, 0.06), 0 8px 24px -12px rgba(32, 26, 22, 0.18);
   --app-shadow-lift: 0 2px 4px rgba(32, 26, 22, 0.08), 0 18px 40px -16px rgba(32, 26, 22, 0.3);
+  --app-deep-bg: var(--surface-deep);
+  --app-deep-border: transparent;
+  --app-deep-text: #fffaf3;
+  --app-deep-muted: rgba(255, 250, 243, 0.72);
+  --app-deep-label: var(--accent-soft);
+  --app-hero-shade: linear-gradient(180deg, rgba(20, 14, 10, 0.28) 0%, rgba(20, 14, 10, 0.55) 45%, rgba(20, 14, 10, 0.92) 100%);
+  /* Fields, states */
+  --app-field-bg: #fff;
+  --app-field-border: rgba(32, 26, 22, 0.2);
+  --app-field-focus: rgba(181, 110, 69, 0.25);
+  --app-placeholder: #8a7d72;
+  --app-skeleton-a: rgba(32, 26, 22, 0.06);
+  --app-skeleton-b: rgba(32, 26, 22, 0.11);
+  --app-progress-track: rgba(32, 26, 22, 0.15);
+  --app-progress-ring: rgba(32, 26, 22, 0.25);
+  --app-progress-on: var(--accent);
+  --app-pulse: rgba(181, 110, 69, 0.45);
+  --app-live-dot: var(--accent);
+  --app-badge-bg: #9c5a35;
+  --app-badge-text: #fff;
+  --app-stamp-on: var(--accent-soft);
+  --app-stamp-on-text: var(--surface-deep);
+  --app-stamp-off: rgba(255, 250, 243, 0.45);
+  --app-ticket-bg: #9c5a35;
+  --app-ticket-border: transparent;
+  --app-ticket-text: #fff;
+  --app-ticket-shadow: 0 18px 40px -18px rgba(156, 90, 53, 0.9);
+  --app-alert-bg: #fef2f2;
+  --app-alert-border: rgba(127, 29, 29, 0.2);
+  --app-alert-text: #7f1d1d;
+  /* Type */
+  --app-heading-font: var(--font-display);
+  --app-radius: 1.25rem;
   --app-pad: 1.25rem;
+}
+
+/* Dusk: the customer app's own look. Contrast, worst case (inside a card,
+   under the brightest glow): text 8.8:1, muted 4.8:1, outline-button text
+   5.5:1, amber button label 7.2:1, placeholder 4.9:1, field border 3.5:1,
+   empty stamp 4.2:1. */
+.app-theme {
+  --background: #1e140f;
+  --foreground: #f3e3d0;
+  --surface: rgba(255, 226, 196, 0.06);
+  --surface-deep: #2b1c15;
+  --line: rgba(243, 222, 200, 0.13);
+  --accent: #e2915a; /* focus rings */
+  --accent-soft: #c4a68d;
+
+  --app-bg: #1e140f;
+  --app-text: #f3e3d0;
+  --app-muted: #c4a68d;
+  --app-label: #c4a68d;
+  --app-accent-ink: #f3e3d0;
+  --app-btn-bg: #e2915a;
+  --app-btn-text: #23130a;
+  --app-cta-bg: #e2915a;
+  --app-cta-text: #23130a;
+  --app-cta-shadow: 0 10px 28px -12px rgba(226, 145, 90, 0.55);
+  --app-outline: #e2915a;
+  --app-outline-text: #efa772;
+  --app-link: #efa772;
+  --app-chip-bg: transparent;
+  --app-chip-border: rgba(243, 222, 200, 0.22);
+  --app-chip-text: #f3e3d0;
+  --app-nav-active: #efa772;
+  --app-bar-bg: rgba(24, 16, 11, 0.9);
+  --app-card-bg: rgba(255, 226, 196, 0.06);
+  --app-card-border: rgba(243, 222, 200, 0.13);
+  --app-shadow: inset 0 1px 0 rgba(255, 226, 196, 0.04), 0 14px 32px -20px rgba(0, 0, 0, 0.7);
+  --app-shadow-lift: inset 0 1px 0 rgba(255, 226, 196, 0.06), 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+  --app-deep-bg: radial-gradient(120% 90% at 0% 0%, rgba(206, 112, 58, 0.2), rgba(206, 112, 58, 0) 60%), #2b1c15;
+  --app-deep-border: rgba(237, 166, 114, 0.18);
+  --app-deep-text: #f3e3d0;
+  --app-deep-muted: #c4a68d;
+  --app-deep-label: #c4a68d;
+  --app-hero-shade:
+    linear-gradient(180deg, rgba(30, 18, 12, 0.42) 0%, rgba(58, 32, 20, 0.72) 48%, #1e140f 100%),
+    linear-gradient(180deg, rgba(206, 112, 58, 0.22) 0%, rgba(206, 112, 58, 0) 70%);
+  --app-field-bg: rgba(255, 226, 196, 0.06);
+  --app-field-border: #b8987e;
+  --app-field-focus: rgba(226, 145, 90, 0.35);
+  --app-placeholder: #d2b7a0;
+  --app-skeleton-a: rgba(255, 226, 196, 0.05);
+  --app-skeleton-b: rgba(255, 226, 196, 0.11);
+  --app-progress-track: rgba(243, 227, 208, 0.16);
+  --app-progress-ring: rgba(243, 227, 208, 0.32);
+  --app-progress-on: #f3e3d0;
+  --app-pulse: rgba(243, 227, 208, 0.35);
+  --app-live-dot: #f3e3d0;
+  --app-badge-bg: #f3e3d0;
+  --app-badge-text: #23130a;
+  --app-stamp-on: #f3e3d0;
+  --app-stamp-on-text: #2b1c15;
+  --app-stamp-off: #b09178;
+  --app-ticket-bg: radial-gradient(90% 80% at 50% 30%, rgba(206, 112, 58, 0.32), rgba(206, 112, 58, 0.06)), #2b1c15;
+  --app-ticket-border: rgba(237, 166, 114, 0.35);
+  --app-ticket-text: #f3e3d0;
+  --app-ticket-shadow: 0 20px 50px -20px rgba(206, 112, 58, 0.55);
+  --app-alert-bg: rgba(232, 112, 90, 0.14);
+  --app-alert-border: rgba(240, 140, 120, 0.4);
+  --app-alert-text: #f6bcaa;
+  --app-heading-font: var(--font-app-heading);
+
+  position: relative;
+  isolation: isolate;
+  background: var(--app-bg);
+  color: var(--app-text);
+  color-scheme: dark;
+  accent-color: #e2915a;
+}
+
+/* The sunset glow: warm light falling from the top of the screen, and a
+   faint rose-orange haze in the far corner. Fixed, so it stays put while
+   the page scrolls, and behind everything. */
+.app-theme::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(130% 55% at 50% 0%, rgba(206, 112, 58, 0.24), rgba(206, 112, 58, 0) 70%),
+    radial-gradient(90% 40% at 100% 100%, rgba(190, 96, 60, 0.1), rgba(190, 96, 60, 0) 70%);
+}
+
+/* No bright edge when a phone over-scrolls past the app, and a dark page
+   scrollbar on tablets and laptops. */
+html:has(.app-theme) {
+  color-scheme: dark;
+}
+
+body:has(.app-theme) {
+  background: #1e140f;
+}
+
+/* Selected text stays in the cream family (amber is only for buttons). */
+.app-theme ::selection {
+  background: #f3e3d0;
+  color: #23130a;
 }
 
 /* In the components layer, so Tailwind utilities on an element (flex, w-full,
@@ -464,7 +625,7 @@ body {
   }
 
   .app-title {
-    font-family: var(--font-display), Georgia, serif;
+    font-family: var(--app-heading-font), Georgia, serif;
     font-size: clamp(2.1rem, 1.6rem + 2.4vw, 2.6rem);
     line-height: 1;
     letter-spacing: -0.035em;
@@ -472,10 +633,48 @@ body {
   }
 
   .app-heading {
-    font-family: var(--font-display), Georgia, serif;
+    font-family: var(--app-heading-font), Georgia, serif;
     font-size: 1.45rem;
     line-height: 1.1;
     letter-spacing: -0.025em;
+  }
+
+  /* Big display numbers and words (the ready ticket, the stamp count). */
+  .app-display {
+    font-family: var(--app-heading-font), Georgia, serif;
+  }
+
+  /* The home screen photo's shade: a sunset fade in dusk. */
+  .app-hero-shade {
+    background: var(--app-hero-shade);
+  }
+
+  /* The café's name: flowing script, used large and sparingly. */
+  .app-script {
+    font-family: var(--font-app-script, var(--app-heading-font)), Georgia, serif;
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: 1.05;
+  }
+
+  /* Dusk headings: an italic calligraphic serif. It runs smaller than the
+     paper face, so it is set a size up and a little heavier. */
+  .app-theme .app-title,
+  .app-theme .app-heading,
+  .app-theme .app-display {
+    font-style: italic;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+  }
+
+  .app-theme .app-title {
+    font-size: clamp(2.45rem, 1.95rem + 2.4vw, 2.95rem);
+    line-height: 1.02;
+  }
+
+  .app-theme .app-heading {
+    font-size: 1.65rem;
+    line-height: 1.12;
   }
 
   .app-label {
@@ -483,21 +682,34 @@ body {
     font-weight: 650;
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: var(--app-accent-ink);
+    color: var(--app-label);
+  }
+
+  .app-link {
+    color: var(--app-link);
+    font-weight: 600;
   }
 
   .app-card {
-    background: var(--surface);
-    border: 1px solid var(--line);
+    background: var(--app-card-bg);
+    border: 1px solid var(--app-card-border);
     border-radius: var(--app-radius);
     box-shadow: var(--app-shadow);
   }
 
   .app-card-dark {
-    background: var(--surface-deep);
-    color: #fffaf3;
+    background: var(--app-deep-bg);
+    border: 1px solid var(--app-deep-border);
+    color: var(--app-deep-text);
     border-radius: var(--app-radius);
     box-shadow: var(--app-shadow-lift);
+  }
+
+  .app-alert {
+    background: var(--app-alert-bg);
+    border: 1px solid var(--app-alert-border);
+    color: var(--app-alert-text);
+    border-radius: 0.75rem;
   }
 
   /* Buttons: one height, one radius, a press response that reads as tactile. */
@@ -530,14 +742,14 @@ body {
   }
 
   .app-btn-primary {
-    background: var(--foreground);
-    color: #fffaf3;
+    background: var(--app-btn-bg);
+    color: var(--app-btn-text);
   }
 
   .app-btn-accent {
-    background: var(--app-accent-fill);
-    color: #fff;
-    box-shadow: 0 10px 24px -12px rgba(156, 90, 53, 0.8);
+    background: var(--app-cta-bg);
+    color: var(--app-cta-text);
+    box-shadow: var(--app-cta-shadow);
   }
 
   .app-accent-ink {
@@ -545,9 +757,9 @@ body {
   }
 
   .app-btn-secondary {
-    border: 1px solid rgba(32, 26, 22, 0.22);
+    border: 1px solid var(--app-outline);
     background: transparent;
-    color: var(--foreground);
+    color: var(--app-outline-text);
   }
 
   .app-btn-block {
@@ -563,8 +775,9 @@ body {
     min-height: 2.75rem;
     padding: 0 1rem;
     border-radius: 999px;
-    border: 1px solid var(--line);
-    background: var(--surface);
+    border: 1px solid var(--app-chip-border);
+    background: var(--app-chip-bg);
+    color: var(--app-chip-text);
     font-size: 0.875rem;
     font-weight: 550;
     white-space: nowrap;
@@ -572,9 +785,9 @@ body {
   }
 
   .app-chip[aria-current="true"] {
-    background: var(--foreground);
-    border-color: var(--foreground);
-    color: #fffaf3;
+    background: var(--app-btn-bg);
+    border-color: var(--app-btn-bg);
+    color: var(--app-btn-text);
   }
 
   /* Quantity stepper: a pill that grows out of the Add button. */
@@ -582,8 +795,8 @@ body {
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
-    background: var(--foreground);
-    color: #fffaf3;
+    background: var(--app-btn-bg);
+    color: var(--app-btn-text);
     animation: app-pop 260ms var(--ease-out-expo) both;
   }
 
@@ -609,27 +822,49 @@ body {
     width: 100%;
     min-height: 3.25rem;
     border-radius: 0.9rem;
-    border: 1px solid rgba(32, 26, 22, 0.2);
-    background: #fff;
+    border: 1px solid var(--app-field-border);
+    background: var(--app-field-bg);
+    color: var(--app-text);
     padding: 0.75rem 1rem;
     font-size: 1rem; /* 16px stops iPhone zooming into the field */
     transition: border-color 200ms ease, box-shadow 200ms ease;
   }
 
+  .app-field::placeholder {
+    color: var(--app-placeholder);
+  }
+
   .app-field:focus {
     outline: none;
-    border-color: var(--foreground);
-    box-shadow: 0 0 0 3px rgba(181, 110, 69, 0.25);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--app-field-focus);
   }
 
   .app-field[aria-invalid="true"] {
-    border-color: #9b2c2c;
+    border-color: var(--app-alert-text);
+  }
+
+  .app-theme .app-field:-webkit-autofill,
+  .app-theme .app-field:autofill {
+    -webkit-text-fill-color: var(--app-text);
+    caret-color: var(--app-text);
+    box-shadow: inset 0 0 0 100px #2a1d16;
+  }
+
+  .app-theme .app-field:-webkit-autofill:focus,
+  .app-theme .app-field:autofill:focus {
+    box-shadow: inset 0 0 0 100px #2a1d16, 0 0 0 3px var(--app-field-focus);
+  }
+
+  /* Cards you can tap carry an amber arrow, like every other pressable thing. */
+  .app-go {
+    color: var(--app-link);
   }
 
   /* Loading placeholders that shimmer instead of a spinner. */
   .app-skeleton {
     border-radius: 0.75rem;
-    background: linear-gradient(90deg, rgba(32, 26, 22, 0.06) 25%, rgba(32, 26, 22, 0.11) 50%, rgba(32, 26, 22, 0.06) 75%);
+    background: linear-gradient(90deg, var(--app-skeleton-a) 25%, var(--app-skeleton-b) 50%, var(--app-skeleton-a) 75%);
     background-size: 200% 100%;
     animation: app-shimmer 1.4s ease-in-out infinite;
   }
@@ -649,19 +884,19 @@ body {
     width: 0.85rem;
     height: 0.85rem;
     border-radius: 999px;
-    border: 2px solid rgba(32, 26, 22, 0.25);
-    background: var(--background);
+    border: 2px solid var(--app-progress-ring);
+    background: transparent;
     transition: background-color 400ms ease, border-color 400ms ease, transform 400ms var(--ease-out-expo);
   }
 
   .app-progress-dot[data-state="done"] {
-    background: var(--accent);
-    border-color: var(--accent);
+    background: var(--app-progress-on);
+    border-color: var(--app-progress-on);
   }
 
   .app-progress-dot[data-state="current"] {
-    border-color: var(--accent);
-    background: var(--accent);
+    border-color: var(--app-progress-on);
+    background: var(--app-progress-on);
     transform: scale(1.25);
     animation: app-pulse 1.8s ease-in-out infinite;
   }
@@ -669,7 +904,7 @@ body {
   .app-progress-line {
     height: 2px;
     flex: 1;
-    background: rgba(32, 26, 22, 0.15);
+    background: var(--app-progress-track);
     position: relative;
     overflow: hidden;
   }
@@ -678,7 +913,7 @@ body {
     content: "";
     position: absolute;
     inset: 0;
-    background: var(--accent);
+    background: var(--app-progress-on);
     transform-origin: left;
     animation: app-fill 600ms var(--ease-out-expo) both;
   }
@@ -686,10 +921,11 @@ body {
   /* The collection ticket shown once an order is ready: the number a
      customer holds up at the counter, readable at arm's length. */
   .app-ticket {
-    background: var(--app-accent-fill);
-    color: #fff;
+    background: var(--app-ticket-bg);
+    border: 1px solid var(--app-ticket-border);
+    color: var(--app-ticket-text);
     border-radius: var(--app-radius);
-    box-shadow: 0 18px 40px -18px rgba(156, 90, 53, 0.9);
+    box-shadow: var(--app-ticket-shadow);
     animation: app-pop 420ms var(--ease-out-expo) both;
   }
 }
@@ -710,8 +946,8 @@ body {
 }
 
 @keyframes app-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(181, 110, 69, 0.45); }
-  50% { box-shadow: 0 0 0 7px rgba(181, 110, 69, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 var(--app-pulse); }
+  50% { box-shadow: 0 0 0 7px transparent; }
 }
 
 @keyframes app-fill {

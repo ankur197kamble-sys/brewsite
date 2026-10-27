@@ -16,7 +16,7 @@ export function RememberTable({ token, label }: { token: string; label: string }
   }, [token, label, router]);
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-[#f3eee5] px-6 text-center text-[#201a16]">
+    <main className="app-theme flex min-h-dvh items-center justify-center px-6 text-center">
       <p role="status" className="text-lg">
         Opening the menu for <strong>{label}</strong>…
       </p>

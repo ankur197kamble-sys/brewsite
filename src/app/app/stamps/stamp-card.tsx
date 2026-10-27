@@ -151,16 +151,16 @@ export function StampCard() {
           <p className="app-heading">
             Collect {STAMPS_PER_REWARD} stamps, get a treat on us
           </p>
-          <ol className="mt-4 space-y-3 text-[0.95rem] leading-6 text-white/85">
+          <ol className="mt-4 space-y-3 text-[0.95rem] leading-6 text-[var(--app-deep-muted)]">
             <li>
-              <strong className="text-white">1.</strong> When you place an order, tick{" "}
-              <em className="not-italic text-[var(--accent-soft)]">Collect a loyalty stamp</em> and add your mobile number.
+              <strong className="text-[var(--app-deep-text)]">1.</strong> When you place an order, tick{" "}
+              <em className="not-italic text-[var(--app-deep-label)]">Collect a loyalty stamp</em> and add your mobile number.
             </li>
             <li>
-              <strong className="text-white">2.</strong> You get one stamp each time you collect an order.
+              <strong className="text-[var(--app-deep-text)]">2.</strong> You get one stamp each time you collect an order.
             </li>
             <li>
-              <strong className="text-white">3.</strong> At {STAMPS_PER_REWARD} stamps, show this screen at the counter for your treat.
+              <strong className="text-[var(--app-deep-text)]">3.</strong> At {STAMPS_PER_REWARD} stamps, show this screen at the counter for your treat.
             </li>
           </ol>
         </div>
@@ -180,7 +180,7 @@ export function StampCard() {
       <PendingStamps numbers={pending} />
 
       <section className="app-card-dark mt-6 overflow-hidden p-6" aria-labelledby="card-heading">
-        <p className="text-[0.7rem] font-semibold tracking-[0.18em] text-[var(--accent-soft)] uppercase">
+        <p className="text-[0.7rem] font-semibold tracking-[0.18em] text-[var(--app-deep-label)] uppercase">
           Number ending {loyalty.phone}
         </p>
         <h2 id="card-heading" className="app-heading mt-2 text-[1.6rem]">
@@ -200,8 +200,8 @@ export function StampCard() {
                 key={index}
                 className={`flex aspect-square items-center justify-center rounded-full border transition-colors ${
                   on
-                    ? "border-[var(--accent-soft)] bg-[var(--accent-soft)] text-[var(--surface-deep)]"
-                    : "border-white/25 text-white/30"
+                    ? "border-[var(--app-stamp-on)] bg-[var(--app-stamp-on)] text-[var(--app-stamp-on-text)]"
+                    : "border-[var(--app-stamp-off)] text-[var(--app-stamp-off)]"
                 }`}
               >
                 <CupIcon filled={on} />
@@ -210,7 +210,7 @@ export function StampCard() {
           })}
         </ol>
 
-        <p className="mt-6 text-sm leading-6 text-white/75">
+        <p className="mt-6 text-sm leading-6 text-[var(--app-deep-muted)]">
           {reward
             ? "Show this screen at the counter to claim your treat."
             : "One stamp is added each time you collect an order."}
