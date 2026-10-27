@@ -6,6 +6,8 @@ import { telHref, whatsappHref } from "@/app/lib/site-cafe";
 import { loadAppData } from "./data";
 import { InstallPrompt, OrderStart } from "./home-widgets";
 import { scriptFont } from "./script-font";
+import { GreetingCard } from "./greeting-card";
+import { greetingFor } from "@/app/lib/greeting";
 import { AppUnavailable } from "./unavailable";
 
 type Action = { href: string; label: string; external: boolean };
@@ -31,6 +33,7 @@ export default async function AppHome() {
           alt=""
           fill
           preload
+          quality={90}
           sizes="(max-width: 448px) 100vw, 448px"
           className="-z-20 object-cover"
         />
@@ -39,15 +42,17 @@ export default async function AppHome() {
           className="app-hero-shade absolute inset-0 -z-10"
         />
         {cafe.highlights && (
-          <p className="text-[0.7rem] font-semibold tracking-[0.18em] text-[#f3e3d0] uppercase [text-shadow:0_1px_10px_rgba(0,0,0,0.55)]">
+          <p className="app-hero-in text-[0.7rem] font-semibold tracking-[0.18em] text-[#f3e3d0] uppercase [text-shadow:0_1px_10px_rgba(0,0,0,0.55)]">
             {cafe.highlights}
           </p>
         )}
-        <h1 className="app-script mt-2 text-[3.4rem]">{cafe.name}</h1>
-        <p className="mt-2 text-[1.05rem] text-[#f3e3d0] [text-shadow:0_1px_10px_rgba(0,0,0,0.55)]">{cafe.tagline}</p>
+        <h1 className="app-script app-hero-in mt-2 text-[3.4rem]">{cafe.name}</h1>
+        <p className="app-hero-in mt-2 text-[1.05rem] text-[#f3e3d0] [text-shadow:0_1px_10px_rgba(0,0,0,0.55)]">{cafe.tagline}</p>
       </header>
 
       <div className="app-stagger relative z-10 -mt-5 space-y-5 px-[var(--app-pad)] pb-6">
+        <GreetingCard greeting={greetingFor(new Date())} />
+
         <OrderStart hasMenu={menu.length > 0} />
 
         {offers.length > 0 && (

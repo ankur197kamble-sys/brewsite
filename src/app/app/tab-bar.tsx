@@ -75,7 +75,7 @@ export function AppTabBar() {
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className={`relative flex min-h-[4.25rem] flex-col items-center justify-center gap-1 text-[0.72rem] font-semibold tracking-wide transition-colors duration-200 ${
+                className={`app-tab relative flex min-h-[4.25rem] flex-col items-center justify-center gap-1 text-[0.72rem] font-semibold tracking-wide transition-colors duration-200 ${
                   active ? "text-[var(--app-nav-active)]" : "text-[var(--app-muted)]"
                 }`}
               >
@@ -88,7 +88,9 @@ export function AppTabBar() {
                 {tab.icon}
                 {tab.label}
                 {tab.href === "/app/menu" && cartCount > 0 && (
-                  <span className="absolute top-2 left-1/2 ml-2.5 min-w-5 rounded-full bg-[var(--app-cta-bg)] px-1.5 text-center text-[0.68rem] leading-5 font-bold text-[var(--app-cta-text)]">
+                  <span
+                    key={cartCount}
+                    className="app-bump absolute top-2 left-1/2 ml-2.5 min-w-5 rounded-full bg-[var(--app-cta-bg)] px-1.5 text-center text-[0.68rem] leading-5 font-bold text-[var(--app-cta-text)]">
                     {cartCount}
                     <span className="sr-only"> in your order</span>
                   </span>

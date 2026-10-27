@@ -4,6 +4,9 @@ import { isPreview } from "./src/app/lib/site-mode";
 
 const nextConfig: NextConfig = {
   images: {
+    // 75 is the default; 90 is used for the customer app's hero photo, where
+    // compression shows most under the dark sunset shade.
+    qualities: [75, 90],
     // Derived from the same allowlist the café API validates against, so an
     // owner can never save an image URL this renderer would reject. The
     // upload bucket is limited to its /cafes/ prefix with no query string.

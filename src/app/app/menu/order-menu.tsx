@@ -146,7 +146,7 @@ export function OrderMenu({ menu }: { menu: AppMenuSection[] }) {
         </div>
       )}
 
-      <div className={`space-y-9 px-[var(--app-pad)] pt-6 ${summary.count > 0 ? "pb-28" : "pb-6"}`}>
+      <div className={`app-stagger space-y-9 px-[var(--app-pad)] pt-6 ${summary.count > 0 ? "pb-28" : "pb-6"}`}>
         {menu.map((section) => (
           <section
             key={section.id}
@@ -187,7 +187,9 @@ export function OrderMenu({ menu }: { menu: AppMenuSection[] }) {
                             −
                           </button>
                           <span aria-live="polite" className="w-6 text-center font-semibold tabular-nums">
-                            {quantity}
+                            <span key={quantity} className="app-bump">
+                              {quantity}
+                            </span>
                           </span>
                           <button
                             ref={(element) => {
@@ -212,7 +214,7 @@ export function OrderMenu({ menu }: { menu: AppMenuSection[] }) {
       </div>
 
       {table && summary.count > 0 && (
-        <div className="fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-30 px-3 pb-3">
+        <div className="app-rise fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-30 px-3 pb-3">
           <Link
             href="/app/checkout"
             className="app-btn app-btn-accent mx-auto flex min-h-[3.75rem] max-w-md justify-between rounded-[1.1rem] px-5 text-base"
