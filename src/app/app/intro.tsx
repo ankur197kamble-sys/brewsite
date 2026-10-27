@@ -52,6 +52,11 @@ export function AppIntro({ name, greeting }: { name: string; greeting: Greeting 
             <stop offset="0.45" stopColor="#d67a44" stopOpacity="0.4" />
             <stop offset="1" stopColor="#d67a44" stopOpacity="0" />
           </radialGradient>
+          <radialGradient id="intro-halo" cy="0.55">
+            <stop offset="0" stopColor="#e08a50" stopOpacity="0.55" />
+            <stop offset="0.55" stopColor="#b9643a" stopOpacity="0.22" />
+            <stop offset="1" stopColor="#b9643a" stopOpacity="0" />
+          </radialGradient>
           <linearGradient id="intro-leaf" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" stopColor="#3a2318" />
             <stop offset="1" stopColor="#6b4129" />
@@ -70,6 +75,8 @@ export function AppIntro({ name, greeting }: { name: string; greeting: Greeting 
 
         <g className="i-emblem">
           <g transform="translate(195 360)">
+            {/* The same warm halo as the app icon, so the splash hands over seamlessly. */}
+            <circle r="190" cy="10" fill="url(#intro-halo)" />
             <g className="i-ring">
               {BEANS.map((angle) => (
                 <g key={angle} transform={`rotate(${angle}) translate(0 -112)`}>

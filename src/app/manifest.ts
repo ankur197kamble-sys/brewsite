@@ -49,9 +49,11 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     background_color: "#1e140f",
     theme_color: "#1e140f",
     icons: [
-      { src: "/app-icon/192", sizes: "192x192", type: "image/png" },
-      { src: "/app-icon/512", sizes: "512x512", type: "image/png" },
-      { src: "/app-icon/512", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      // ?v= changes whenever the icon art changes, so phones fetch the new
+      // one instead of a cached copy (icons are cached for a day).
+      { src: "/app-icon/192?v=2", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/app-icon/512?v=2", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/app-icon/512?v=2&maskable", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }

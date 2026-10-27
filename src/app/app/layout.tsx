@@ -25,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: name ? { default: name, template: `%s · ${name}` } : { default: "Order", template: "%s" },
     appleWebApp: { capable: true, title: name ?? undefined, statusBarStyle: "default" },
-    icons: { apple: "/app-icon/180" },
+    icons: { apple: "/app-icon/180?v=2" },
     ...(isPreview ? { robots: { index: false, follow: false } } : {}),
   };
 }
