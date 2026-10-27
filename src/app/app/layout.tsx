@@ -7,7 +7,8 @@ import { AppTabBar } from "./tab-bar";
 import { ServiceWorker } from "./service-worker";
 import { appFonts } from "./fonts";
 import { AppEffects } from "./effects";
-import { AppIntro, INTRO_COOKIE, INTRO_HOLD } from "./intro";
+import { AppIntro } from "./intro";
+import { INTRO_COOKIE, INTRO_HOLD } from "./intro-settings";
 import { greetingFor } from "@/app/lib/greeting";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: name ? { default: name, template: `%s · ${name}` } : { default: "Order", template: "%s" },
     appleWebApp: { capable: true, title: name ?? undefined, statusBarStyle: "default" },
-    icons: { apple: "/app-icon/180" },
+    icons: { apple: "/app-icon/180?v=2" },
     ...(isPreview ? { robots: { index: false, follow: false } } : {}),
   };
 }
