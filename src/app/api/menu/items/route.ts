@@ -2,6 +2,7 @@ import { createItem } from "@/app/db/menu";
 import { getCafeSession } from "@/app/lib/session";
 import { validateMenuItemInput } from "@/app/lib/menu";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 export async function POST(request: Request) {
   try {
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
 
     return apiSuccess(item, 201);
   } catch (error) {
-    console.error("Failed to create menu item:", error);
+    logError("Failed to create menu item:", error);
     return apiError("Failed to create menu item", 500);
   }
 }

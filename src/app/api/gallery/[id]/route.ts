@@ -7,6 +7,7 @@ import { getCafeSession } from "@/app/lib/session";
 import { validateGalleryImagePatch } from "@/app/lib/gallery";
 import { parseId, parseMoveDirection } from "@/app/lib/validation";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -44,7 +45,7 @@ export async function PATCH(request: Request, context: Context) {
 
     return apiSuccess(image);
   } catch (error) {
-    console.error("Failed to update gallery image:", error);
+    logError("Failed to update gallery image:", error);
     return apiError("Failed to update gallery image", 500);
   }
 }
@@ -62,7 +63,7 @@ export async function DELETE(_request: Request, context: Context) {
 
     return apiSuccess({ deleted: true });
   } catch (error) {
-    console.error("Failed to delete gallery image:", error);
+    logError("Failed to delete gallery image:", error);
     return apiError("Failed to delete gallery image", 500);
   }
 }

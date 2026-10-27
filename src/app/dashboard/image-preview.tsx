@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { CafeImage } from "@/app/components/cafe-image";
 import { useState } from "react";
 
 type Props = {
@@ -30,7 +30,7 @@ export function ImagePreview({ src, alt, sizes, emptyLabel }: Props) {
   }
 
   return (
-    <Image
+    <CafeImage
       src={src}
       alt={alt}
       fill

@@ -4,6 +4,7 @@ import { isOrderStatus, STATUS_LABEL } from "@/app/lib/orders";
 import { asRecord } from "@/app/lib/json";
 import { parseId } from "@/app/lib/validation";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -29,7 +30,7 @@ export async function PATCH(request: Request, context: Context) {
     }
     return apiSuccess({ updated: true });
   } catch (error) {
-    console.error("Failed to update order:", error);
+    logError("Failed to update order:", error);
     return apiError("Failed to update order", 500);
   }
 }

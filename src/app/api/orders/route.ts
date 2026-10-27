@@ -1,6 +1,7 @@
 import { listStaffOrders, todayTotals } from "@/app/db/orders";
 import { getCafeSession } from "@/app/lib/session";
 import { apiError, apiSuccess } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 /** Staff orders screen: active orders plus the last 12 hours, and today's totals, for this café only. */
 export async function GET() {
@@ -10,7 +11,7 @@ export async function GET() {
     const [orders, today] = await Promise.all([listStaffOrders(session.cafeId), todayTotals(session.cafeId)]);
     return apiSuccess({ orders, today });
   } catch (error) {
-    console.error("Failed to load orders:", error);
+    logError("Failed to load orders:", error);
     return apiError("Failed to load orders", 500);
   }
 }

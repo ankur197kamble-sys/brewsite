@@ -2,6 +2,7 @@ import { createGalleryImage, getGallery } from "@/app/db/gallery";
 import { getCafeSession } from "@/app/lib/session";
 import { validateGalleryImageInput } from "@/app/lib/gallery";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 export async function GET() {
   try {
@@ -11,7 +12,7 @@ export async function GET() {
     const images = await getGallery(session.cafeId);
     return apiSuccess({ images });
   } catch (error) {
-    console.error("Failed to load gallery:", error);
+    logError("Failed to load gallery:", error);
     return apiError("Failed to load gallery", 500);
   }
 }
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     const image = await createGalleryImage(session.cafeId, parsed.value);
     return apiSuccess(image, 201);
   } catch (error) {
-    console.error("Failed to create gallery image:", error);
+    logError("Failed to create gallery image:", error);
     return apiError("Failed to create gallery image", 500);
   }
 }

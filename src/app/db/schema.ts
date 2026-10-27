@@ -203,6 +203,23 @@ export const users = pgTable(
   (table) => [uniqueIndex("users_email_unique_idx").on(table.email)],
 );
 
+/**
+ * Failed sign-in attempts, kept briefly to slow down password guessing (see
+ * src/app/api/auth/login). `key` is a salted hash of "email:<address>" or
+ * "ip:<address>", never the address itself. Like sessions, not backed up.
+ */
+export const loginAttempts = pgTable(
+  "login_attempts",
+  {
+    id: serial("id").primaryKey(),
+    key: text("key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("login_attempts_key_created_idx").on(table.key, table.createdAt)],
+);
+
 export const sessions = pgTable(
   "sessions",
   {

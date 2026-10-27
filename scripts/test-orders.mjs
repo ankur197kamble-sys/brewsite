@@ -73,7 +73,7 @@ async function main() {
   expectStatus("PATCH /api/orders/1 → 401", await call("PATCH", "/api/orders/1", { body: { status: "ready" } }), 401);
   expectStatus("GET /api/tables → 401", await call("GET", "/api/tables"), 401);
   expectStatus("POST /api/tables → 401", await call("POST", "/api/tables", { body: { label: "x" } }), 401);
-  expectStatus("GET /api/loyalty → 401", await call("GET", "/api/loyalty?phone=9876543210"), 401);
+  expectStatus("POST /api/loyalty → 401", await call("POST", "/api/loyalty", { body: { phone: "9876543210" } }), 401);
   expectStatus("POST /api/loyalty/redeem → 401", await call("POST", "/api/loyalty/redeem", { body: { phone: "9876543210" } }), 401);
 
   const a = await createTenant("Orders A");
@@ -257,12 +257,12 @@ async function main() {
   );
 
   section("Loyalty stamps");
-  let card = (await call("GET", "/api/loyalty?phone=98765 43210", { cookie: a.cookie })).json?.data;
+  let card = (await call("POST", "/api/loyalty", { body: { phone: "98765 43210" }, cookie: a.cookie })).json?.data;
   check("completing the order earned exactly 1 stamp", card?.stamps === 1, JSON.stringify(card));
   check("once collected, the customer's status page shows the card", (await call("GET", `/api/public/orders/${order.token}`)).json?.data?.loyalty?.card?.stamps === 1);
-  const cardB = (await call("GET", "/api/loyalty?phone=9876543210", { cookie: b.cookie })).json?.data;
+  const cardB = (await call("POST", "/api/loyalty", { body: { phone: "9876543210" }, cookie: b.cookie })).json?.data;
   check("stamps are per café (café B sees 0 for the same number)", cardB?.stamps === 0);
-  expectStatus("invalid phone lookup → 400", await call("GET", "/api/loyalty?phone=123", { cookie: a.cookie }), 400);
+  expectStatus("invalid phone lookup → 400", await call("POST", "/api/loyalty", { body: { phone: "123" }, cookie: a.cookie }), 400);
   expectStatus("no reward yet → 409", await call("POST", "/api/loyalty/redeem", { cookie: a.cookie, body: { phone: "9876543210" } }), 409);
   await sql.query(`UPDATE loyalty_cards SET stamps = 10 WHERE cafe_id = $1 AND phone = '919876543210'`, [a.cafeId]);
   result = await call("POST", "/api/loyalty/redeem", { cookie: a.cookie, body: { phone: "+91 98765-43210" } });
@@ -275,7 +275,7 @@ async function main() {
   const cancelId = ((await call("GET", "/api/orders", { cookie: a.cookie })).json?.data?.orders ?? []).find((o) => o.number === cancelOrder?.number)?.id;
   expectStatus("cancel an active order → 200", await call("PATCH", `/api/orders/${cancelId}`, { cookie: a.cookie, body: { status: "cancelled" } }), 200);
   expectStatus("cancelled is final → 409", await call("PATCH", `/api/orders/${cancelId}`, { cookie: a.cookie, body: { status: "completed" } }), 409);
-  check("a cancelled order earns no stamp", (await call("GET", "/api/loyalty?phone=9123456789", { cookie: a.cookie })).json?.data?.stamps === 0);
+  check("a cancelled order earns no stamp", (await call("POST", "/api/loyalty", { body: { phone: "9123456789" }, cookie: a.cookie })).json?.data?.stamps === 0);
 
   section("QR codes and table changes");
   const oldToken = counter.token;
@@ -310,6 +310,20 @@ async function main() {
   const rushOk = rush.filter((r) => r.status === 201).length;
   const rushLimited = rush.filter((r) => r.status === 429 && /This table/.test(r.json?.message ?? "")).length;
   check("a table takes 15 orders in 10 minutes, even when 25 arrive at once", rushOk === 15 && rushLimited === 10, `${rushOk} ok, ${rushLimited} limited`);
+
+  // Someone floods a table with fake orders: staff cancel them and the
+  // table takes real orders again straight away.
+  const rushNumbers = new Set(rush.filter((r) => r.status === 201).map((r) => r.json?.data?.number));
+  const rushIds = ((await call("GET", "/api/orders", { cookie: a.cookie })).json?.data?.orders ?? [])
+    .filter((o) => o.tableLabel === rushTable.label && rushNumbers.has(o.number))
+    .map((o) => o.id);
+  const cancelled = [];
+  for (const id of rushIds.slice(0, 2)) {
+    cancelled.push((await call("PATCH", `/api/orders/${id}`, { cookie: a.cookie, body: { status: "cancelled" } })).status);
+  }
+  check("staff can cancel the fake orders", cancelled.length === 2 && cancelled.every((s) => s === 200), cancelled.join(","));
+  const afterCancel = await placeOrder({ ...good, tableToken: rushTable.token, customerName: "Real customer" });
+  check("…and a real customer at that table can order again", afterCancel.status === 201, `${afterCancel.status}`);
 
   // The café's Wi-Fi: many phones, one internet address.
   const wifi = freshIp();

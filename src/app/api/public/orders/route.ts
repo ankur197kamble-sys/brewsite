@@ -1,13 +1,9 @@
-import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { placeOrder, type RateLimit } from "@/app/db/orders";
 import { validateOrderInput } from "@/app/lib/orders";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
-
-/** Hashed with a server secret: only ever compared, never turned back into the value. */
-function secretHash(value: string): string {
-  return createHash("sha256").update(`${value}|${process.env.DATABASE_URL ?? ""}`).digest("hex");
-}
+import { clientAddress, secretHash } from "@/app/lib/secret-hash";
+import { logError } from "@/app/lib/log";
 
 const LIMIT_MESSAGE: Record<RateLimit, string> = {
   device: "You've placed several orders in the last few minutes. Please wait a little, or ask the staff.",
@@ -28,8 +24,11 @@ export async function POST(request: Request) {
     const parsed = validateOrderInput(await readJsonBody(request));
     if (!parsed.ok) return apiError(parsed.error, 400);
 
-    const ip = (request.headers.get("x-forwarded-for") ?? "").split(",")[0]?.trim() || "unknown";
-    const result = await placeOrder(parsed.value, secretHash(`ip:${ip}`), secretHash(`device:${parsed.value.deviceId}`));
+    const result = await placeOrder(
+      parsed.value,
+      secretHash(`ip:${clientAddress(request)}`),
+      secretHash(`device:${parsed.value.deviceId}`),
+    );
 
     switch (result.status) {
       case "ok":
@@ -55,7 +54,7 @@ export async function POST(request: Request) {
         );
     }
   } catch (error) {
-    console.error("Failed to place order:", error);
+    logError("Failed to place order:", error);
     return apiError("Could not place your order. Please try again.", 500);
   }
 }

@@ -6,6 +6,7 @@ import {
   validateCategoryInput,
 } from "@/app/lib/menu";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -39,7 +40,7 @@ export async function PATCH(request: Request, context: Context) {
 
     return apiSuccess(category);
   } catch (error) {
-    console.error("Failed to update category:", error);
+    logError("Failed to update category:", error);
     return apiError("Failed to update category", 500);
   }
 }
@@ -69,7 +70,7 @@ export async function DELETE(_request: Request, context: Context) {
 
     return apiSuccess({ deleted: true });
   } catch (error) {
-    console.error("Failed to delete category:", error);
+    logError("Failed to delete category:", error);
     return apiError("Failed to delete category", 500);
   }
 }

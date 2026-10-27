@@ -3,6 +3,7 @@ import { getCafeSession } from "@/app/lib/session";
 import { datesAreOrdered, validateOfferPatch } from "@/app/lib/offers";
 import { parseId, parseMoveDirection } from "@/app/lib/validation";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -58,7 +59,7 @@ export async function PATCH(request: Request, context: Context) {
 
     return apiSuccess(offer);
   } catch (error) {
-    console.error("Failed to update offer:", error);
+    logError("Failed to update offer:", error);
     return apiError("Failed to update offer", 500);
   }
 }
@@ -76,7 +77,7 @@ export async function DELETE(_request: Request, context: Context) {
 
     return apiSuccess({ deleted: true });
   } catch (error) {
-    console.error("Failed to delete offer:", error);
+    logError("Failed to delete offer:", error);
     return apiError("Failed to delete offer", 500);
   }
 }

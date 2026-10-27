@@ -14,6 +14,7 @@ import {
   sniffImageType,
 } from "@/app/lib/uploads";
 import { apiError, apiSuccess } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 /** Room for the multipart boundary and headers around the file itself. */
 const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
@@ -138,7 +139,7 @@ export async function POST(request: Request) {
       try {
         await putObject(key, bytes, contentType);
       } catch (error) {
-        console.error("Failed to store upload in R2:", error);
+        logError("Failed to store upload in R2:", error);
         return apiError("The photo could not be stored. Please try again.", 502);
       }
 
@@ -147,12 +148,12 @@ export async function POST(request: Request) {
     } finally {
       if (!stored) {
         await deleteUpload(cafeId, upload.id).catch((error) =>
-          console.error("Failed to release upload reservation:", error),
+          logError("Failed to release upload reservation:", error),
         );
       }
     }
   } catch (error) {
-    console.error("Upload failed:", error);
+    logError("Upload failed:", error);
     return apiError("Upload failed", 500);
   }
 }

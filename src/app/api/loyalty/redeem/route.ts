@@ -3,6 +3,7 @@ import { getCafeSession } from "@/app/lib/session";
 import { normalizeIndianMobile } from "@/app/lib/orders";
 import { asRecord } from "@/app/lib/json";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 /** Staff redeem one reward for `{ phone }`, only if one is available. */
 export async function POST(request: Request) {
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
     if (!card) return apiError("No reward available for this number yet", 409);
     return apiSuccess(card);
   } catch (error) {
-    console.error("Failed to redeem reward:", error);
+    logError("Failed to redeem reward:", error);
     return apiError("Failed to redeem reward", 500);
   }
 }

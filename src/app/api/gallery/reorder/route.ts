@@ -2,6 +2,7 @@ import { reorderGallery } from "@/app/db/gallery";
 import { getCafeSession } from "@/app/lib/session";
 import { validateReorderIds } from "@/app/lib/gallery";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 /**
  * Applies an explicit gallery order: `{ ids: [3, 1, 2] }`.
@@ -30,7 +31,7 @@ export async function PATCH(request: Request) {
 
     return apiSuccess({ reordered: true });
   } catch (error) {
-    console.error("Failed to reorder gallery:", error);
+    logError("Failed to reorder gallery:", error);
     return apiError("Failed to reorder gallery", 500);
   }
 }

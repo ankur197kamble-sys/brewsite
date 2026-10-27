@@ -6,6 +6,7 @@ import {
   validateMenuItemPatch,
 } from "@/app/lib/menu";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -46,7 +47,7 @@ export async function PATCH(request: Request, context: Context) {
 
     return apiSuccess(result.item);
   } catch (error) {
-    console.error("Failed to update menu item:", error);
+    logError("Failed to update menu item:", error);
     return apiError("Failed to update menu item", 500);
   }
 }
@@ -64,7 +65,7 @@ export async function DELETE(_request: Request, context: Context) {
 
     return apiSuccess({ deleted: true });
   } catch (error) {
-    console.error("Failed to delete menu item:", error);
+    logError("Failed to delete menu item:", error);
     return apiError("Failed to delete menu item", 500);
   }
 }

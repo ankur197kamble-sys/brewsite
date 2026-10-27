@@ -2,6 +2,7 @@ import { reorderOffers } from "@/app/db/offers";
 import { getCafeSession } from "@/app/lib/session";
 import { validateReorderIds } from "@/app/lib/offers";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 /**
  * Applies an explicit offer order: `{ ids: [3, 1, 2] }`.
@@ -30,7 +31,7 @@ export async function PATCH(request: Request) {
 
     return apiSuccess({ reordered: true });
   } catch (error) {
-    console.error("Failed to reorder offers:", error);
+    logError("Failed to reorder offers:", error);
     return apiError("Failed to reorder offers", 500);
   }
 }

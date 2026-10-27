@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
-import Image from "next/image";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { CafeImage } from "@/app/components/cafe-image";
 import { formatOfferDate } from "@/app/lib/offers";
 import { STAMPS_PER_REWARD } from "@/app/lib/orders";
 import { telHref, whatsappHref } from "@/app/lib/site-cafe";
@@ -47,7 +47,7 @@ export default async function AppHome({ searchParams }: Props) {
     >
       {intro && <AppIntro name={cafe.name} greeting={greeting} />}
       <header className={`${scriptFont} relative isolate flex min-h-[19rem] flex-col justify-end overflow-hidden px-[var(--app-pad)] pt-[calc(env(safe-area-inset-top)+2.5rem)] pb-7 text-[#fffaf3]`}>
-        <Image
+        <CafeImage
           src={cafe.heroImage}
           alt=""
           fill

@@ -3,6 +3,7 @@ import { getCafeSession } from "@/app/lib/session";
 import { validateTableLabel } from "@/app/lib/orders";
 import { asRecord } from "@/app/lib/json";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 const MAX_TABLES = 100;
 
@@ -12,7 +13,7 @@ export async function GET() {
     if (!session) return apiError("Authentication required", 401);
     return apiSuccess({ tables: await listTables(session.cafeId) });
   } catch (error) {
-    console.error("Failed to load tables:", error);
+    logError("Failed to load tables:", error);
     return apiError("Failed to load tables", 500);
   }
 }
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     }
     return apiSuccess(await createTable(session.cafeId, label.value), 201);
   } catch (error) {
-    console.error("Failed to create table:", error);
+    logError("Failed to create table:", error);
     return apiError("Failed to create table", 500);
   }
 }

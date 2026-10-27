@@ -4,6 +4,7 @@ import { validateTableLabel } from "@/app/lib/orders";
 import { asRecord } from "@/app/lib/json";
 import { parseId } from "@/app/lib/validation";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -39,7 +40,7 @@ export async function PATCH(request: Request, context: Context) {
     if (!table) return apiError("Table not found", 404);
     return apiSuccess(table);
   } catch (error) {
-    console.error("Failed to update table:", error);
+    logError("Failed to update table:", error);
     return apiError("Failed to update table", 500);
   }
 }
@@ -55,7 +56,7 @@ export async function DELETE(_request: Request, context: Context) {
     if (!(await deleteTable(session.cafeId, tableId))) return apiError("Table not found", 404);
     return apiSuccess({ deleted: true });
   } catch (error) {
-    console.error("Failed to delete table:", error);
+    logError("Failed to delete table:", error);
     return apiError("Failed to delete table", 500);
   }
 }

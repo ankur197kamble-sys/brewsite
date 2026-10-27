@@ -14,21 +14,22 @@
     "backfill-gallery": "node --env-file=.env.local scripts/backfill-gallery.mjs",
     "test:offers": "node --env-file=.env.local scripts/test-offers.mjs",
     "test:menu": "node --env-file=.env.local scripts/test-menu.mjs",
-    "test": "npm run test:cafe && npm run test:menu && npm run test:offers && npm run test:uploads && npm run test:orders",
+    "test": "npm run test:cafe && npm run test:menu && npm run test:offers && npm run test:uploads && npm run test:orders && npm run test:auth",
     "test:uploads": "node --env-file=.env.local scripts/test-uploads.mjs",
     "import-cafe": "node --env-file=.env.local scripts/import-cafe.mjs",
     "backup": "node --env-file=.env.local scripts/backup.mjs",
     "restore": "node --env-file=.env.local scripts/restore.mjs",
     "test:cafe": "node --env-file=.env.local scripts/test-cafe.mjs",
     "test:backup": "node --env-file=.env.local scripts/test-backup.mjs",
-    "test:orders": "node --env-file=.env.local scripts/test-orders.mjs"
+    "test:orders": "node --env-file=.env.local scripts/test-orders.mjs",
+    "test:auth": "node --env-file=.env.local scripts/test-auth.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
     "aws4fetch": "^1.0.20",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
-    "next": "16.3.4",
+    "next": "16.4.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "uqr": "^0.1.3"
@@ -40,7 +41,7 @@
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "16.4.3",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
