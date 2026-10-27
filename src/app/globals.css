@@ -932,7 +932,7 @@ body:has(.app-theme) {
 }
 
 /* ============================================================ app motion
- * How the customer app moves: a short branded intro once per visit, screens
+ * How the customer app moves: a short branded intro after a break, screens
  * that rise into place, a soft glow ripple and a springy press on anything
  * you tap, small "bumps" when a number changes, and a slowly breathing
  * sunset. Only transform and opacity animate (cheap on phones). With the
@@ -1071,7 +1071,7 @@ body:has(.app-theme) {
     pointer-events: none;
   }
 
-  /* Opening intro, once per visit (about 5 seconds, a tap skips it):
+  /* Opening intro, when the app is opened after a break (about 5 seconds, a tap skips it):
        0.0s  the emblem sits exactly where the Android splash screen showed
              the app icon (same art), so the splash flows straight in
        0.0s  a sunset rises, rings of light spread
