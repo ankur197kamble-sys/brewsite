@@ -8,7 +8,8 @@ const RIPPLE = ".app-btn, .app-chip, .app-stepper button, .app-tab";
 /**
  * One listener for the whole app: when a button is pressed, start a soft
  * glow ripple from the point that was touched (drawn by CSS, see
- * .is-rippling in globals.css). Purely decorative.
+ * [data-rippling] in globals.css). Purely decorative. A data attribute, not
+ * a class, because React rewrites className when a tab becomes active.
  */
 export function AppEffects() {
   useEffect(() => {
@@ -20,14 +21,14 @@ export function AppEffects() {
       target.style.setProperty("--ry", `${event.clientY - box.top}px`);
       // Big enough to cover the whole button from any starting point.
       target.style.setProperty("--rs", String((Math.max(box.width, box.height) / 12) * 2.6));
-      target.classList.remove("is-rippling");
+      delete target.dataset.rippling;
       void target.offsetWidth; // restart the animation on a quick second tap
-      target.classList.add("is-rippling");
+      target.dataset.rippling = "";
     }
 
     function onEnd(event: AnimationEvent) {
       if (event.target instanceof HTMLElement && event.animationName.startsWith("app-ripple")) {
-        event.target.classList.remove("is-rippling");
+        delete event.target.dataset.rippling;
       }
     }
 

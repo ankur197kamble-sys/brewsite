@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Greeting } from "@/app/lib/greeting";
 import { scriptFont } from "./script-font";
 import { INTRO_COOKIE } from "./intro-settings";
@@ -9,6 +9,16 @@ import { INTRO_COOKIE } from "./intro-settings";
 export function markIntroSeen() {
   document.cookie = `${INTRO_COOKIE}=1; path=/; SameSite=Lax`;
 }
+
+/**
+ * When the intro is over (its fade-out ends at 5.25s, or 2.85s with reduced
+ * motion) plus a margin for the page underneath to finish coming in. Timed
+ * from page load, so it also holds if the page hydrated late.
+ */
+const INTRO_END_MS = 6000;
+const INTRO_END_REDUCED_MS = 3300;
+/** A skip fades the intro out in 320ms (see .app-intro--leaving). */
+const SKIP_FADE_MS = 400;
 
 const BEANS = Array.from({ length: 12 }, (_, index) => index * 30);
 
@@ -23,28 +33,53 @@ const LEAVES: { x: number; y: number; angle: number; delay: number }[] = [
 ];
 
 /**
- * The opening moment, once per visit: a sunset rises, coffee leaves sweep in
- * and away, a coffee-bean mandala turns while a cup draws itself and steam
- * rises, then the café's name writes in and the greeting appears. All CSS
- * and vector art (see .app-intro in globals.css), rendered by the server so
- * it is there from the first frame. A tap skips it; screen readers skip it
+ * The opening moment, once per visit: the app icon's emblem grows out of the
+ * splash screen, a sunset rises, coffee leaves sweep in and away, then the
+ * café's name writes in and the greeting appears. All CSS and vector art
+ * (see .app-intro in globals.css), rendered by the server so it is there
+ * from the first frame. A tap or any key skips it; screen readers skip it
  * entirely and go straight to the page, which shows the same greeting.
+ *
+ * When it is over it removes itself and releases the page's entry delay, so
+ * later screens (the layout stays mounted across them) appear at once.
  */
 export function AppIntro({ name, greeting }: { name: string; greeting: Greeting }) {
   const root = useRef<HTMLDivElement>(null);
+  const [done, setDone] = useState(false);
+
+  const finish = useCallback(() => {
+    root.current?.closest<HTMLElement>(".app-theme")?.style.setProperty("--app-intro-delay", "0s", "important");
+    setDone(true);
+  }, []);
+
+  const skip = useCallback(() => {
+    const element = root.current;
+    if (!element || element.classList.contains("app-intro--leaving")) return;
+    element.classList.add("app-intro--leaving");
+    // The page underneath comes in now rather than when the intro would have ended.
+    element.closest<HTMLElement>(".app-theme")?.style.setProperty("--app-intro-delay", "0s", "important");
+    setTimeout(finish, SKIP_FADE_MS);
+  }, [finish]);
 
   useEffect(() => {
     markIntroSeen();
-  }, []);
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const end = reduced ? INTRO_END_REDUCED_MS : INTRO_END_MS;
+    const timer = setTimeout(finish, Math.max(0, end - performance.now()));
+    // Keyboard and switch users: any key skips, before focus lands on the
+    // page hidden underneath.
+    document.addEventListener("keydown", skip, { once: true });
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("keydown", skip);
+    };
+  }, [finish, skip]);
 
-  function skip() {
-    root.current?.classList.add("app-intro--leaving");
-    // Let the page underneath come in now rather than when the intro would have ended.
-    root.current?.closest<HTMLElement>(".app-theme")?.style.setProperty("--app-intro-delay", "0s", "important");
-  }
+  if (done) return null;
 
   return (
     <div ref={root} className={`${scriptFont} app-intro`} aria-hidden="true" onPointerDown={skip}>
+      {/* Back layer: sunset and rings of light, filling the screen. */}
       <svg className="app-intro__scene" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice">
         <defs>
           <radialGradient id="intro-sun">
@@ -52,27 +87,26 @@ export function AppIntro({ name, greeting }: { name: string; greeting: Greeting 
             <stop offset="0.45" stopColor="#d67a44" stopOpacity="0.4" />
             <stop offset="1" stopColor="#d67a44" stopOpacity="0" />
           </radialGradient>
-          <radialGradient id="intro-halo" cy="0.55">
-            <stop offset="0" stopColor="#e08a50" stopOpacity="0.55" />
-            <stop offset="0.55" stopColor="#b9643a" stopOpacity="0.22" />
-            <stop offset="1" stopColor="#b9643a" stopOpacity="0" />
-          </radialGradient>
-          <linearGradient id="intro-leaf" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stopColor="#3a2318" />
-            <stop offset="1" stopColor="#6b4129" />
-          </linearGradient>
         </defs>
-
         <g className="i-sun">
           <circle cx="195" cy="760" r="330" fill="url(#intro-sun)" />
         </g>
-
         <g className="i-rays" fill="none" stroke="#f3e3d0">
           <circle cx="195" cy="360" r="120" />
           <circle cx="195" cy="360" r="175" />
           <circle cx="195" cy="360" r="235" />
         </g>
+      </svg>
 
+      {/* The emblem: always whole on screen (meet), whatever its shape. */}
+      <svg className="app-intro__scene" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <radialGradient id="intro-halo" cy="0.55">
+            <stop offset="0" stopColor="#e08a50" stopOpacity="0.55" />
+            <stop offset="0.55" stopColor="#b9643a" stopOpacity="0.22" />
+            <stop offset="1" stopColor="#b9643a" stopOpacity="0" />
+          </radialGradient>
+        </defs>
         <g className="i-emblem">
           <g transform="translate(195 360)">
             {/* The same warm halo as the app icon, so the splash hands over seamlessly. */}
@@ -89,19 +123,28 @@ export function AppIntro({ name, greeting }: { name: string; greeting: Greeting 
             </g>
 
             <g className="i-cup" fill="none" stroke="#f3e3d0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <path pathLength={1} d="M -34 -6 L -28 34 C -26 44, -18 48, -8 48 L 8 48 C 18 48, 26 44, 28 34 L 34 -6 Z" />
-              <path pathLength={1} d="M 33 4 C 52 2, 54 26, 30 28" />
-              <path pathLength={1} d="M -52 56 C -30 64, 30 64, 52 56" />
+              <path d="M -34 -6 L -28 34 C -26 44, -18 48, -8 48 L 8 48 C 18 48, 26 44, 28 34 L 34 -6 Z" />
+              <path d="M 33 4 C 52 2, 54 26, 30 28" />
+              <path d="M -52 56 C -30 64, 30 64, 52 56" />
             </g>
 
             <g className="i-steam" fill="none" stroke="#f3e3d0" strokeWidth="2.2" strokeLinecap="round" strokeOpacity="0.8">
-              <path pathLength={1} d="M -14 -16 C -24 -30, -4 -40, -14 -56" />
-              <path pathLength={1} d="M 0 -18 C -10 -34, 10 -46, 0 -66" />
-              <path pathLength={1} d="M 14 -16 C 4 -30, 24 -40, 14 -56" />
+              <path d="M -14 -16 C -24 -30, -4 -40, -14 -56" />
+              <path d="M 0 -18 C -10 -34, 10 -46, 0 -66" />
+              <path d="M 14 -16 C 4 -30, 24 -40, 14 -56" />
             </g>
           </g>
         </g>
+      </svg>
 
+      {/* Front layer: coffee leaves sweeping in from the edges. */}
+      <svg className="app-intro__scene" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <linearGradient id="intro-leaf" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#3a2318" />
+            <stop offset="1" stopColor="#6b4129" />
+          </linearGradient>
+        </defs>
         {LEAVES.map((leaf) => (
           <g key={`${leaf.x}-${leaf.y}`} transform={`translate(${leaf.x} ${leaf.y}) rotate(${leaf.angle})`}>
             <g className="i-leaf" style={{ animationDelay: `${leaf.delay}s, 1.95s` }}>

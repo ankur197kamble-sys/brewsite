@@ -53,7 +53,12 @@ export default async function AppHome() {
       <div className="app-stagger relative z-10 -mt-5 space-y-5 px-[var(--app-pad)] pb-6">
         <GreetingCard greeting={greetingFor(new Date())} />
 
-        <OrderStart hasMenu={menu.length > 0} />
+        {/* Server-rendered wrappers: the entry animation runs on them, so a
+            card that only appears after loading (a live order, the install
+            prompt) does not start its own late animation. */}
+        <div>
+          <OrderStart hasMenu={menu.length > 0} />
+        </div>
 
         {offers.length > 0 && (
           <section aria-labelledby="offers-heading">
@@ -129,7 +134,9 @@ export default async function AppHome() {
           </section>
         )}
 
-        <InstallPrompt name={cafe.name} />
+        <div>
+          <InstallPrompt name={cafe.name} />
+        </div>
       </div>
     </main>
   );
