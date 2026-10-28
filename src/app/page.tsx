@@ -1,6 +1,8 @@
 import { cache, type CSSProperties } from "react";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
+import { appFonts } from "@/app/app/fonts";
+import { scriptFont } from "@/app/app/script-font";
 import { CafeImage } from "@/app/components/cafe-image";
 import { Parallax } from "@/app/components/parallax";
 import { Reveal } from "@/app/components/reveal";
@@ -28,6 +30,9 @@ import { isPreview } from "@/app/lib/site-mode";
 import { getPublicCafeId } from "@/app/lib/tenant";
 
 export const dynamic = "force-dynamic";
+
+/** Phone browser bars match the dusk page, as in the customer app. */
+export const viewport: Viewport = { themeColor: "#1e140f" };
 
 /** Staggers the hero entrance without a per-element CSS class. */
 const enterAfter = (ms: number) =>
@@ -125,9 +130,13 @@ export default async function Home() {
     // overflow-x-clip (not overflow-hidden) contains the parallax and zoom
     // effects sideways without creating a scroll container, which would stop
     // the menu's sticky category bar from sticking.
-    <main className="overflow-x-clip bg-[#f3eee5] text-[#201a16]">
+    // app-theme gives the website the customer app's dusk look (colours,
+    // sunset glow, grain); site-dusk adapts the website's own pieces to it.
+    <main
+      className={`app-theme site-dusk ${appFonts} ${scriptFont} overflow-x-clip`}
+    >
       {/* ------------------------------------------------------------ hero */}
-      <section className="relative isolate flex min-h-[100svh] flex-col justify-between overflow-hidden text-[#fffaf3]">
+      <section className="relative isolate flex min-h-[100svh] flex-col justify-between overflow-hidden text-[#f3e3d0]">
         <Parallax
           speed={0.12}
           className="absolute inset-x-0 -top-[8%] -z-20 h-[116%]"
@@ -146,17 +155,13 @@ export default async function Home() {
 
         <div
           aria-hidden="true"
-          className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(20,14,10,.42),rgba(20,14,10,.16)_32%,rgba(20,14,10,.86))]"
+          className="site-hero-shade absolute inset-0 -z-10"
         />
-        <div aria-hidden="true" className="grain -z-10" />
 
         <header className="shell flex items-center justify-between pt-7 lg:pt-10">
           <SiteMark name={siteCafe.name} className="hero-enter" />
           <div className="hero-enter flex gap-2" style={enterAfter(80)}>
-            <a
-              href="#menu"
-              className="button-secondary border-white/55 text-white hover:border-white"
-            >
+            <a href="#menu" className="button-secondary button-on-photo">
               Menu
             </a>
             <Link href="/app" className="button-primary button-light">
@@ -168,19 +173,23 @@ export default async function Home() {
         <div className="shell pb-14 lg:pb-20">
           {heroLine && (
             <p
-              className="eyebrow hero-enter mb-7 text-white/75"
+              className="eyebrow hero-enter mb-5 text-[#f3e3d0]/85 [text-shadow:0_1px_10px_rgba(0,0,0,0.55)]"
               style={enterAfter(160)}
             >
               {heroLine}
             </p>
           )}
 
-          <h1
-            className="font-display display-xl hero-enter max-w-5xl text-balance"
-            style={enterAfter(260)}
+          <h1 className="site-script hero-enter" style={enterAfter(260)}>
+            {siteCafe.name}
+          </h1>
+
+          <p
+            className="font-display display-md hero-enter mt-4 max-w-4xl text-balance [text-shadow:0_1px_14px_rgba(0,0,0,0.5)]"
+            style={enterAfter(340)}
           >
             {siteCafe.tagline}
-          </h1>
+          </p>
 
           <div
             className="hero-enter mt-11 flex flex-wrap items-center gap-x-7 gap-y-5"
@@ -192,7 +201,7 @@ export default async function Home() {
                 ↘
               </span>
             </a>
-            <span className="text-sm text-white/70">
+            <span className="text-sm text-[#f3e3d0]/80">
               Made for long conversations.
             </span>
           </div>
@@ -272,7 +281,7 @@ export default async function Home() {
                 delay={index * 110}
                 className={index === 0 ? "md:col-span-2" : ""}
               >
-                <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-[#201a16]/12 bg-[#fbf8f2]">
+                <article className="app-card flex h-full flex-col overflow-hidden">
                   {offer.imageUrl && (
                     <figure
                       className={`image-frame relative ${
@@ -297,7 +306,7 @@ export default async function Home() {
 
                   <div className="flex flex-1 flex-col p-7 sm:p-9">
                     {offer.value && (
-                      <p className="eyebrow mb-4 text-[#b56e45]">
+                      <p className="eyebrow mb-4 text-[var(--app-label)]">
                         {offer.value}
                       </p>
                     )}
@@ -311,13 +320,13 @@ export default async function Home() {
                     </h3>
 
                     {offer.description && (
-                      <p className="mt-4 leading-7 text-[#756a60]">
+                      <p className="mt-4 leading-7 text-[var(--ink-muted)]">
                         {offer.description}
                       </p>
                     )}
 
                     {offer.endDate && (
-                      <p className="mt-6 text-sm text-[#756a60]">
+                      <p className="mt-6 text-sm text-[var(--ink-muted)]">
                         Until {formatOfferDate(offer.endDate)}
                       </p>
                     )}
@@ -348,14 +357,14 @@ export default async function Home() {
           // any category is one tap away from anywhere in a long list.
           <nav
             aria-label="Menu categories"
-            className="sticky top-0 z-10 -mx-[var(--gutter)] mt-10 bg-[#f3eee5]/95 px-[var(--gutter)] py-3 backdrop-blur"
+            className="sticky top-0 z-10 -mx-[var(--gutter)] mt-10 bg-[var(--app-bar-bg)] px-[var(--gutter)] py-3 backdrop-blur"
           >
             <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 lg:flex-wrap lg:overflow-visible">
               {menu.sections.map((section) => (
                 <li key={section.key} className="shrink-0">
                   <a
                     href={`#menu-${section.key}`}
-                    className="inline-flex min-h-11 items-center rounded-full border border-[#201a16]/15 px-4 text-sm font-medium whitespace-nowrap transition hover:border-[#201a16]/40 hover:bg-[#201a16]/5 focus-visible:outline-2 focus-visible:outline-offset-2"
+                    className="inline-flex min-h-11 items-center rounded-full border border-[var(--app-chip-border)] px-4 text-sm font-medium whitespace-nowrap transition hover:border-[#f3e3d0]/50 hover:bg-[#f3e3d0]/5 focus-visible:outline-2 focus-visible:outline-offset-2"
                   >
                     {section.name}
                   </a>
@@ -393,16 +402,16 @@ export default async function Home() {
                   className={showMenuNav ? "scroll-mt-24 lg:scroll-mt-32" : ""}
                 >
                   {section.name && (
-                    <h3 className="eyebrow mb-6 text-[#b56e45]">
+                    <h3 className="eyebrow mb-6 text-[var(--app-label)]">
                       {section.name}
                     </h3>
                   )}
 
-                  <div className="border-t border-[#201a16]/12">
+                  <div className="border-t border-[var(--line)]">
                     {section.items.map((item) => (
                       <article
                         key={item.key}
-                        className={`menu-row border-b border-[#201a16]/12 ${compactMenu ? "py-4" : "py-7"}`}
+                        className={`menu-row border-b border-[var(--line)] ${compactMenu ? "py-4" : "py-7"}`}
                       >
                         <div className="sm:max-w-lg">
                           <h4
@@ -411,7 +420,7 @@ export default async function Home() {
                             {item.name}
                           </h4>
                           {item.description && (
-                            <p className="mt-2 leading-7 text-[#756a60]">
+                            <p className="mt-2 leading-7 text-[var(--ink-muted)]">
                               {item.description}
                             </p>
                           )}
@@ -440,7 +449,7 @@ export default async function Home() {
       {/* ----------------------------------------------------------- visit */}
       <section
         id="visit"
-        className="section-pad scroll-mt-16 bg-[#27201c] text-[#fffaf3]"
+        className="site-deep section-pad scroll-mt-16"
       >
         <div className="shell grid gap-16 lg:grid-cols-[1.1fr_.9fr] lg:gap-24">
           <SectionIntro
@@ -452,16 +461,16 @@ export default async function Home() {
                 for a cup.
               </>
             }
-            eyebrowClassName="text-[#e8b995]"
+            eyebrowClassName="text-[var(--app-label)]"
             titleClassName="display-lg"
           />
 
           <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-1 lg:gap-14">
             {(siteCafe.address.length > 0 || siteCafe.mapsUrl) && (
               <Reveal delay={120}>
-                <h3 className="eyebrow mb-5 text-[#e8b995]">Location</h3>
+                <h3 className="eyebrow mb-5 text-[var(--app-label)]">Location</h3>
                 {siteCafe.address.length > 0 && (
-                  <address className="text-lg leading-8 not-italic text-[#fffaf3]/80">
+                  <address className="text-lg leading-8 not-italic text-[#f3e3d0]/85">
                     {siteCafe.address.map((line, index) => (
                       <span key={`${index}-${line}`} className="block">
                         {line}
@@ -474,7 +483,7 @@ export default async function Home() {
                     href={siteCafe.mapsUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="button-secondary mt-7 border-white/45 text-white hover:border-white"
+                    className="button-secondary mt-7"
                   >
                     Directions
                     <span aria-hidden="true" className="button-arrow">
@@ -487,15 +496,15 @@ export default async function Home() {
 
             {(siteCafe.hours.length > 0 || hasContact) && (
               <Reveal delay={220}>
-                <h3 className="eyebrow mb-5 text-[#e8b995]">
+                <h3 className="eyebrow mb-5 text-[var(--app-label)]">
                   {siteCafe.hours.length > 0 ? "Opening hours" : "Get in touch"}
                 </h3>
                 {siteCafe.hours.length > 0 && (
-                  <ul className="text-lg text-[#fffaf3]/80">
+                  <ul className="text-lg text-[#f3e3d0]/85">
                     {siteCafe.hours.map((hour, index) => (
                       <li
                         key={`${index}-${hour}`}
-                        className="border-b border-white/12 py-2.5 last:border-b-0"
+                        className="border-b border-[var(--line)] py-2.5 last:border-b-0"
                       >
                         {hour}
                       </li>
@@ -520,7 +529,7 @@ export default async function Home() {
                     {siteCafe.phone && (
                       <a
                         href={telHref(siteCafe.phone)}
-                        className="button-secondary border-white/45 text-white hover:border-white"
+                        className="button-secondary"
                       >
                         Call {siteCafe.phone}
                       </a>
@@ -534,9 +543,9 @@ export default async function Home() {
       </section>
 
       {/* ---------------------------------------------------------- footer */}
-      <footer className="bg-[#27201c] px-[var(--gutter)] pb-10 text-[#fffaf3]">
-        <div className="mx-auto flex max-w-[88rem] flex-col justify-between gap-7 border-t border-white/15 py-9 text-sm text-white/60 sm:flex-row sm:items-center">
-          <SiteMark name={siteCafe.name} className="text-white" />
+      <footer className="bg-[#2b1c15] px-[var(--gutter)] pb-10">
+        <div className="mx-auto flex max-w-[88rem] flex-col justify-between gap-7 border-t border-[var(--line)] py-9 text-sm text-[var(--ink-muted)] sm:flex-row sm:items-center">
+          <SiteMark name={siteCafe.name} className="text-[#f3e3d0]" />
 
           {(siteCafe.instagram || siteCafe.mapsUrl) && (
             <nav className="flex gap-7" aria-label="Elsewhere">
@@ -545,7 +554,7 @@ export default async function Home() {
                   href={siteCafe.instagram}
                   target="_blank"
                   rel="noreferrer"
-                  className="link-underline transition hover:text-white"
+                  className="link-underline transition hover:text-[#f3e3d0]"
                 >
                   Instagram
                 </a>
@@ -555,7 +564,7 @@ export default async function Home() {
                   href={siteCafe.mapsUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="link-underline transition hover:text-white"
+                  className="link-underline transition hover:text-[#f3e3d0]"
                 >
                   Directions
                 </a>
