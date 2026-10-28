@@ -17,7 +17,7 @@ export function SectionIntro({
   title,
   lede,
   className = "",
-  eyebrowClassName = "text-[#756a60]",
+  eyebrowClassName = "text-[var(--ink-muted)]",
   titleClassName = "display-md",
 }: SectionIntroProps) {
   return (
