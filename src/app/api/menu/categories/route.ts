@@ -2,6 +2,7 @@ import { createCategory } from "@/app/db/menu";
 import { getCafeSession } from "@/app/lib/session";
 import { validateCategoryInput } from "@/app/lib/menu";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 export async function POST(request: Request) {
   try {
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
     const category = await createCategory(session.cafeId, parsed.value);
     return apiSuccess(category, 201);
   } catch (error) {
-    console.error("Failed to create category:", error);
+    logError("Failed to create category:", error);
     return apiError("Failed to create category", 500);
   }
 }

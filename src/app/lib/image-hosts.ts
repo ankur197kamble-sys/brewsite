@@ -1,17 +1,26 @@
 /**
  * Where the public site is allowed to load images from.
  *
- * This is the single source of truth for two things that must never drift
- * apart: `next.config.ts` image `remotePatterns` (what `next/image` will
- * render) and API validation (what an owner is allowed to save). If they
- * diverge, a café can save a URL that renders as a broken image.
+ * This is the single source of truth for what an owner is allowed to save
+ * (API validation) and how each saved photo is displayed, so a café can never
+ * save a URL that renders as a broken image:
  *
- * Widening this to every host would turn `/_next/image` into an open image
- * proxy for anyone on the internet, so sources are added deliberately.
+ * - Pasted links (Unsplash) are resized by Unsplash itself and loaded straight
+ *   from it by `components/cafe-image.tsx`. They never pass through our
+ *   `/_next/image`, which would otherwise resize any of Unsplash's millions of
+ *   photos for anyone who asked, using up the hosting plan's image quota.
+ * - Uploaded photos are resized by `/_next/image`, which `next.config.ts`
+ *   limits to the bucket's `/cafes/` prefix with no query string.
  */
 
-/** External hosts an owner may paste links from. */
-export const ALLOWED_IMAGE_HOSTS = ["images.unsplash.com"] as const;
+/** Unsplash serves its photos through imgix, which resizes on request. */
+export const UNSPLASH_HOST = "images.unsplash.com";
+
+/**
+ * External hosts an owner may paste links from. Each one needs a loader in
+ * `components/cafe-image.tsx`, because `/_next/image` does not serve them.
+ */
+export const ALLOWED_IMAGE_HOSTS = [UNSPLASH_HOST] as const;
 
 /** Every uploaded object lives under `cafes/<cafeId>/` in the bucket. */
 export const UPLOADS_PATH_PREFIX = "/cafes/";
@@ -58,21 +67,24 @@ const LEGACY_UPLOAD_HOSTS = (process.env.NEXT_PUBLIC_UPLOADS_LEGACY_HOSTS ?? "")
 type ImageSource = { hostname: string; pathPrefix?: string; noQuery?: boolean };
 
 /**
- * Pasted-link hosts plus, when configured, the upload bucket restricted to
- * the `/cafes/` prefix with no query string, so the bucket's other paths are
- * never proxied.
+ * What `/_next/image` resizes: when configured, the upload bucket only,
+ * restricted to the `/cafes/` prefix with no query string, so the bucket's
+ * other paths are never proxied.
  */
-export const IMAGE_SOURCES: readonly ImageSource[] = [
+export const OPTIMIZED_IMAGE_SOURCES: readonly ImageSource[] = UPLOADS_BASE_URL
+  ? [new URL(UPLOADS_BASE_URL).hostname, ...LEGACY_UPLOAD_HOSTS].map(
+      (hostname) => ({
+        hostname,
+        pathPrefix: UPLOADS_PATH_PREFIX,
+        noQuery: true,
+      }),
+    )
+  : [];
+
+/** Everything an owner may save: pasted-link hosts plus the upload bucket. */
+const IMAGE_SOURCES: readonly ImageSource[] = [
   ...ALLOWED_IMAGE_HOSTS.map((hostname) => ({ hostname })),
-  ...(UPLOADS_BASE_URL
-    ? [new URL(UPLOADS_BASE_URL).hostname, ...LEGACY_UPLOAD_HOSTS].map(
-        (hostname) => ({
-          hostname,
-          pathPrefix: UPLOADS_PATH_PREFIX,
-          noQuery: true,
-        }),
-      )
-    : []),
+  ...OPTIMIZED_IMAGE_SOURCES,
 ];
 
 /** One-line guidance shown under image fields in the dashboard. */

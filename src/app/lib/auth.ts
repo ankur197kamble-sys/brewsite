@@ -15,6 +15,8 @@ const scrypt = promisify<string, Buffer, number, Buffer>(scryptCallback);
 
 const KEY_LENGTH = 64;
 const SALT_LENGTH = 16;
+const SALT_PATTERN = new RegExp(`^[0-9a-f]{${SALT_LENGTH * 2}}$`);
+const HASH_PATTERN = new RegExp(`^[0-9a-f]{${KEY_LENGTH * 2}}$`);
 
 export const SESSION_COOKIE = "brewsite_session";
 export const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -32,18 +34,26 @@ export async function verifyPassword(
   stored: string,
 ): Promise<boolean> {
   const [scheme, saltHex, hashHex] = stored.split(":");
-  if (scheme !== "scrypt" || !saltHex || !hashHex) return false;
+  // Only the exact shape hashPassword writes is accepted. A malformed value
+  // would otherwise decode to empty buffers, and an empty hash "matches"
+  // every password.
+  if (
+    scheme !== "scrypt" ||
+    !SALT_PATTERN.test(saltHex ?? "") ||
+    !HASH_PATTERN.test(hashHex ?? "")
+  ) {
+    return false;
+  }
 
   const expected = Buffer.from(hashHex, "hex");
+  if (expected.length !== KEY_LENGTH) return false;
   const derived = await scrypt(
     password,
     Buffer.from(saltHex, "hex"),
-    expected.length,
+    KEY_LENGTH,
   );
 
-  return (
-    derived.length === expected.length && timingSafeEqual(derived, expected)
-  );
+  return timingSafeEqual(derived, expected);
 }
 
 /**

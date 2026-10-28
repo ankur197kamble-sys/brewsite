@@ -12,11 +12,14 @@
  *
  * The public homepage always renders café #1, so to check what visitors see
  * it briefly inserts a few "[test]" offers for café #1 and removes them in
- * the same cleanup. Nothing else belonging to café #1 is touched.
+ * the same cleanup. The one that shows is plainly a test ("Test only") and
+ * ends today, so even if cleanup never ran it would disappear by itself
+ * tomorrow. Nothing else belonging to café #1 is touched.
  */
 import { inArray } from "drizzle-orm";
 import { db } from "../src/app/db/index.ts";
 import { offers } from "../src/app/db/schema.ts";
+import { CAFE_TIME_ZONE } from "../src/app/lib/cafe-time.ts";
 import {
   call,
   check,
@@ -29,6 +32,15 @@ import {
 } from "./lib/harness.mjs";
 
 const PUBLIC_CAFE_ID = 1;
+
+/** Today in the café's time zone as YYYY-MM-DD, and as the homepage shows it. */
+const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: CAFE_TIME_ZONE }).format(new Date());
+const todayShown = new Date(`${todayIso}T00:00:00Z`).toLocaleDateString("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: "UTC",
+});
 
 async function listOffers(cookie) {
   const result = await call("GET", "/api/offers", { cookie });
@@ -201,7 +213,7 @@ async function main() {
   check("homepage renders → 200", before.status === 200, `got ${before.status}`);
 
   const publicSpecs = {
-    live: { title: tag("public live"), value: "Buy 1 get 1", endDate: "2099-12-31" },
+    live: { title: tag("public live"), value: "Test only", endDate: todayIso },
     draft: { title: tag("public draft"), isPublished: false },
     scheduled: { title: tag("public scheduled"), startDate: "2099-01-01" },
     ended: { title: tag("public ended"), endDate: "2020-01-01" },
@@ -219,8 +231,8 @@ async function main() {
   check("homepage still renders with offers → 200", home.status === 200);
   check("offers section is present", home.text.includes('id="offers"'));
   check("live offer is shown", home.text.includes(publicSpecs.live.title));
-  check("offer value badge is shown", home.text.includes("Buy 1 get 1"));
-  check("end date is shown", home.text.includes("Until 31 Dec 2099"));
+  check("offer value badge is shown", home.text.includes("Test only"));
+  check("end date is shown", home.text.includes(`Until ${todayShown}`));
   check("unpublished offer is hidden", !home.text.includes(publicSpecs.draft.title));
   check("scheduled offer is hidden", !home.text.includes(publicSpecs.scheduled.title));
   check("ended offer is hidden", !home.text.includes(publicSpecs.ended.title));

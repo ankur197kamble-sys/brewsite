@@ -1,5 +1,6 @@
 import { getPublicOrder } from "@/app/db/orders";
 import { apiError, apiSuccess } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 type Context = { params: Promise<{ token: string }> };
 
@@ -13,7 +14,7 @@ export async function GET(_request: Request, context: Context) {
     if (!order) return apiError("Order not found", 404);
     return apiSuccess(order);
   } catch (error) {
-    console.error("Failed to load order:", error);
+    logError("Failed to load order:", error);
     return apiError("Could not load this order", 500);
   }
 }

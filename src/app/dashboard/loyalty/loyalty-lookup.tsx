@@ -27,7 +27,12 @@ export function LoyaltyLookup() {
     setCard(null);
     setNotice(null);
     try {
-      const response = await fetch(`/api/loyalty?phone=${encodeURIComponent(phone)}`, { cache: "no-store" });
+      const response = await fetch("/api/loyalty", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+        cache: "no-store",
+      });
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) {
         setCard(null);

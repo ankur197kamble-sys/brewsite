@@ -20,8 +20,9 @@ export const BACKUP_VERSION = 1;
 
 /**
  * Every table worth keeping, parents before children (the order rows must be
- * inserted in). `sessions` is deliberately excluded: login tokens are
- * short-lived, and restoring them would revive signed-out logins.
+ * inserted in). `sessions` and `login_attempts` are deliberately excluded:
+ * login tokens are short-lived (restoring them would revive signed-out
+ * logins), and failed sign-in records only matter for a few minutes.
  */
 export const TABLES = [
   "cafes",

@@ -121,6 +121,7 @@ export async function getActiveTableByToken(token: string) {
  *   room for a shared "Counter" QR at a busy moment.
  * - Per network: every customer on the café's Wi-Fi shares one internet
  *   address, so this is set for a full café, as a backstop across tables.
+ * Orders staff have cancelled are not counted.
  */
 const RATE_WINDOW_SECONDS = 10 * 60;
 export const MAX_ORDERS_PER_DEVICE = 6;
@@ -270,6 +271,9 @@ export async function placeOrder(
         FROM ${orders}
         WHERE cafe_id = ${cafeId}::int
           AND created_at >= now() - make_interval(secs => ${RATE_WINDOW_SECONDS}::int)
+          -- Orders staff cancelled do not count, so cancelling a burst of
+          -- fake orders frees the table for real customers straight away.
+          AND status <> 'cancelled'
       ), verdict AS (
         SELECT CASE
           WHEN EXISTS (SELECT 1 FROM existing WHERE same) THEN 'existing'

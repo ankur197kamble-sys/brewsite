@@ -2,6 +2,7 @@ import { createOffer, getOffers } from "@/app/db/offers";
 import { getCafeSession } from "@/app/lib/session";
 import { validateOfferInput } from "@/app/lib/offers";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
+import { logError } from "@/app/lib/log";
 
 export async function GET() {
   try {
@@ -11,7 +12,7 @@ export async function GET() {
     const offers = await getOffers(session.cafeId);
     return apiSuccess({ offers });
   } catch (error) {
-    console.error("Failed to load offers:", error);
+    logError("Failed to load offers:", error);
     return apiError("Failed to load offers", 500);
   }
 }
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
     const offer = await createOffer(session.cafeId, parsed.value);
     return apiSuccess(offer, 201);
   } catch (error) {
-    console.error("Failed to create offer:", error);
+    logError("Failed to create offer:", error);
     return apiError("Failed to create offer", 500);
   }
 }

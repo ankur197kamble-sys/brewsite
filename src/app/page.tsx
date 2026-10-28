@@ -1,7 +1,7 @@
 import { cache, type CSSProperties } from "react";
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
+import { CafeImage } from "@/app/components/cafe-image";
 import { Parallax } from "@/app/components/parallax";
 import { Reveal } from "@/app/components/reveal";
 import { SectionIntro } from "@/app/components/section-intro";
@@ -133,7 +133,7 @@ export default async function Home() {
           className="absolute inset-x-0 -top-[8%] -z-20 h-[116%]"
         >
           <div className="hero-media relative h-full w-full">
-            <Image
+            <CafeImage
               src={siteCafe.heroImage}
               alt={`Inside ${siteCafe.name}`}
               className="object-cover"
@@ -237,7 +237,7 @@ export default async function Home() {
               className={tile.wrap}
             >
               <figure className={`image-frame relative ${tile.frame}`}>
-                <Image
+                <CafeImage
                   src={image.url}
                   alt={image.alt}
                   className="object-cover"
@@ -281,7 +281,7 @@ export default async function Home() {
                           : "h-[14rem] sm:h-[17rem]"
                       }`}
                     >
-                      <Image
+                      <CafeImage
                         src={offer.imageUrl}
                         alt=""
                         className="object-cover"

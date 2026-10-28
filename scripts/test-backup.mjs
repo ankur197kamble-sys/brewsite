@@ -16,8 +16,27 @@ import { join, resolve } from "node:path";
 import { neon } from "@neondatabase/serverless";
 import { BACKUP_DIR, TABLES } from "./lib/backup-core.mjs";
 
-const sql = neon(process.env.DATABASE_URL);
+const database = neon(process.env.DATABASE_URL);
 const run = randomBytes(3).toString("hex");
+
+/**
+ * Ctrl+C only raises a flag, as in lib/harness.mjs: the next query stops the
+ * run and the cleanup below still runs, so no test café, copied schema or
+ * temporary backup file is left behind. A second Ctrl+C force-quits.
+ */
+let interrupted = false;
+process.once("SIGINT", () => {
+  interrupted = true;
+  console.error("\nInterrupted — stopping after the current step, then cleaning up (Ctrl+C again to force quit)...");
+});
+
+/** The test's queries; each refuses to start once the run is interrupted. */
+const sql = {
+  query(...args) {
+    if (interrupted) throw new Error("Interrupted");
+    return database.query(...args);
+  },
+};
 const work = mkdtempSync(join(tmpdir(), "brewsite-backup-test-"));
 const testSchema = `bs_restore_test_${run}`;
 const scriptsDir = resolve("scripts");
@@ -86,7 +105,8 @@ async function main() {
     [testCafeId],
   );
   // So the logins and uploads tables are exercised too, not compared empty.
-  await sql.query(`INSERT INTO users (cafe_id, email, password_hash) VALUES ($1, $2, 'scrypt:test:test')`, [testCafeId, `backup-${run}@brewsite.test`]);
+  // The stored hash is deliberately malformed, so this login can never sign in.
+  await sql.query(`INSERT INTO users (cafe_id, email, password_hash) VALUES ($1, $2, 'scrypt:disabled')`, [testCafeId, `backup-${run}@brewsite.test`]);
   await sql.query(
     `INSERT INTO uploads (cafe_id, key, url, content_type, size_bytes) VALUES ($1, $2, 'https://example.test/x.webp', 'image/webp', 1234)`,
     [testCafeId, `cafes/${testCafeId}/test-${run}.webp`],
@@ -130,10 +150,10 @@ async function main() {
   const backup = JSON.parse(readFileSync(backupFile, "utf8"));
   const [{ tables: liveTables }] = await sql.query(
     `SELECT array_agg(table_name::text ORDER BY table_name) AS tables FROM information_schema.tables
-     WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name <> 'sessions'`,
+     WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name NOT IN ('sessions', 'login_attempts')`,
   );
-  check("every database table except sessions is backed up", JSON.stringify([...TABLES].sort()) === JSON.stringify(liveTables), `${liveTables}`);
-  check("login sessions are excluded", !("sessions" in backup.tables));
+  check("every database table except sessions and sign-in attempts is backed up", JSON.stringify([...TABLES].sort()) === JSON.stringify(liveTables), `${liveTables}`);
+  check("login sessions and sign-in attempts are excluded", !("sessions" in backup.tables) && !("login_attempts" in backup.tables));
   check("id counters are recorded", TABLES.every((table) => Number.isInteger(backup.sequences?.[table])), JSON.stringify(backup.sequences));
   const offer = backup.tables.offers.rows.find((row) => row.cafe_id === testCafeId && row.title === "Weekend deal");
   check("calendar dates stay exact (no time-zone shift)", offer?.end_date === "2099-12-31" && offer?.start_date === "2026-01-01", JSON.stringify(offer));
@@ -308,8 +328,8 @@ try {
 } finally {
   // Each step on its own, so one failure cannot leave the others undone.
   const steps = [
-    ["test cafés", async () => { if (testCafeIds.length) await sql.query(`DELETE FROM cafes WHERE id = ANY($1::int[])`, [testCafeIds]); }],
-    ["temporary schema", () => sql.query(`DROP SCHEMA IF EXISTS ${testSchema} CASCADE`)],
+    ["test cafés", async () => { if (testCafeIds.length) await database.query(`DELETE FROM cafes WHERE id = ANY($1::int[])`, [testCafeIds]); }],
+    ["temporary schema", () => database.query(`DROP SCHEMA IF EXISTS ${testSchema} CASCADE`)],
     ["temporary files", async () => rmSync(work, { recursive: true, force: true })],
   ];
   for (const [label, step] of steps) {

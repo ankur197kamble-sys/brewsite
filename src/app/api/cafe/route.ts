@@ -6,6 +6,7 @@ import { parseImageUrl } from "@/app/lib/image-hosts";
 import { getCafeSession } from "@/app/lib/session";
 import { apiError, apiSuccess, readJsonBody } from "@/app/lib/api-response";
 import { asRecord, isNonEmptyString } from "@/app/lib/json";
+import { logError } from "@/app/lib/log";
 
 const MAX_GALLERY_IMAGES = 3;
 const MAX_HOURS_LINES = 10;
@@ -164,7 +165,7 @@ export async function POST(request: Request) {
 
     return apiSuccess(cafe);
   } catch (error) {
-    console.error("Failed to save café:", error);
+    logError("Failed to save café:", error);
     return apiError("Failed to save café information", 500);
   }
 }
@@ -184,7 +185,7 @@ export async function GET() {
 
     return apiSuccess(cafe);
   } catch (error) {
-    console.error("Failed to fetch café:", error);
+    logError("Failed to fetch café:", error);
     return apiError("Failed to fetch café information", 500);
   }
 }
