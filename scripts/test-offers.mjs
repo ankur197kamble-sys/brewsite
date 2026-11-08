@@ -10,11 +10,14 @@
  * pass or fail. Deleting a test café cascades to its users, sessions and
  * offers.
  *
- * The public homepage always renders café #1, so to check what visitors see
- * it briefly inserts a few "[test]" offers for café #1 and removes them in
- * the same cleanup. The one that shows is plainly a test ("Test only") and
- * ends today, so even if cleanup never ran it would disappear by itself
- * tomorrow. Nothing else belonging to café #1 is touched.
+ * The public homepage always renders café #1, so the homepage check only
+ * runs when asked for, because it briefly inserts a few "[test]" offers for
+ * the real café #1:
+ *   npm run test:offers:public
+ * They are removed in the same cleanup. The one that shows is plainly a test
+ * ("Test only") and ends today, so even if cleanup never ran it would
+ * disappear by itself tomorrow. Nothing else belonging to café #1 is touched.
+ * Run it only while the dev server uses a database where that is acceptable.
  */
 import { inArray } from "drizzle-orm";
 import { db } from "../src/app/db/index.ts";
@@ -32,6 +35,7 @@ import {
 } from "./lib/harness.mjs";
 
 const PUBLIC_CAFE_ID = 1;
+const CHECK_PUBLIC_HOMEPAGE = process.argv.includes("--public-homepage");
 
 /** Today in the café's time zone as YYYY-MM-DD, and as the homepage shows it. */
 const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: CAFE_TIME_ZONE }).format(new Date());
@@ -207,6 +211,14 @@ async function main() {
   expectStatus("delete again → 404", await call("DELETE", `/api/offers/${created.ended.id}`, { cookie: a.cookie }), 404);
   check("café A now lists 3 offers", (await listOffers(a.cookie)).length === 3);
   expectStatus("reorder with a deleted id → 404", await call("PATCH", "/api/offers/reorder", { cookie: a.cookie, body: { ids: reversed } }), 404);
+
+  if (!CHECK_PUBLIC_HOMEPAGE) {
+    console.log(
+      `\n(Skipped the public homepage check: it writes test offers to café #${PUBLIC_CAFE_ID}. ` +
+        "Run npm run test:offers:public to include it.)",
+    );
+    return;
+  }
 
   section(`Public homepage (café #${PUBLIC_CAFE_ID})`);
   const before = await call("GET", "/");

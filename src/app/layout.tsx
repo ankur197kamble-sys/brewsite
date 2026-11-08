@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import { loadCafeHeadline } from "./app/data";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -21,11 +22,18 @@ const fraunces = Fraunces({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "BrewSite — Specialty coffee, slowly served",
-  description:
-    "A considered coffee experience, from first light to last conversation.",
-};
+/**
+ * Fallback title and description for pages that don't set their own (the
+ * customer app, "page not found", offline). They use the café's own name and
+ * tagline, never the platform's. If the café can't be read, the title stays
+ * neutral and no description is given.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const headline = await loadCafeHeadline();
+  return headline
+    ? { title: headline.name, description: headline.tagline }
+    : { title: "Welcome" };
+}
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

@@ -3,6 +3,9 @@ import { OPTIMIZED_IMAGE_SOURCES } from "./src/app/lib/image-hosts";
 import { isPreview } from "./src/app/lib/site-mode";
 
 const nextConfig: NextConfig = {
+  // Don't announce the framework in every response (X-Powered-By header).
+  poweredByHeader: false,
+
   images: {
     // 75 is the default; 90 is used for the customer app's hero photo, where
     // compression shows most under the dark sunset shade.
