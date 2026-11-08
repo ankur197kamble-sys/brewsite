@@ -12,7 +12,9 @@ import { db } from "../../src/app/db/index.ts";
 import { cafes, users } from "../../src/app/db/schema.ts";
 import { hashPassword } from "../../src/app/lib/auth.ts";
 
-export const BASE_URL = process.argv[2] ?? "http://localhost:3000";
+// The first argument that isn't a --flag is the server address.
+export const BASE_URL =
+  process.argv.slice(2).find((arg) => !arg.startsWith("--")) ?? "http://localhost:3000";
 
 if (!/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(BASE_URL)) {
   console.error(`✗ Refusing to run against ${BASE_URL}: local dev servers only.`);

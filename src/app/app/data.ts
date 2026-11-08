@@ -79,14 +79,24 @@ export async function loadAppData(): Promise<AppData | null> {
 }
 
 /**
- * The café's own name, or null if it cannot be read right now. Cached for
- * the request, since the page title and the opening intro both need it.
+ * The café's own name and tagline, or null if they cannot be read right now.
+ * Cached for the request, since page titles, descriptions and the opening
+ * intro all need them.
  */
-export const loadCafeName = cache(async (): Promise<string | null> => {
-  try {
-    const dbCafe = await withRetry(() => getCafe(getPublicCafeId()));
-    return dbCafe ? getSiteCafe(dbCafe, fallbackCafe).name : null;
-  } catch {
-    return null;
-  }
-});
+export const loadCafeHeadline = cache(
+  async (): Promise<{ name: string; tagline: string } | null> => {
+    try {
+      const dbCafe = await withRetry(() => getCafe(getPublicCafeId()));
+      if (!dbCafe) return null;
+      const { name, tagline } = getSiteCafe(dbCafe, fallbackCafe);
+      return { name, tagline };
+    } catch {
+      return null;
+    }
+  },
+);
+
+/** The café's own name, or null if it cannot be read right now. */
+export const loadCafeName = cache(
+  async (): Promise<string | null> => (await loadCafeHeadline())?.name ?? null,
+);
